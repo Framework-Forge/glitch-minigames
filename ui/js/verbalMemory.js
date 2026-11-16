@@ -1,5 +1,5 @@
 // -- Glitch Minigames
-// -- Copyright (C) 2024-2026 Glitch Studios
+// -- Copyright (C) 2024 Glitch
 // -- 
 // -- This program is free software: you can redistribute it and/or modify
 // -- it under the terms of the GNU General Public License as published by
@@ -216,6 +216,8 @@ function showNextWord() {
     verbalMemoryGameState.currentWord = word;
     verbalMemoryGameState.isNewWord = isNewWord;
     
+    console.log(`Showing word: ${word} (${isNewWord ? 'NEW' : 'SEEN'})`);
+    
     $('#verbal-memory-current-word').text(word);
     $('.verbal-memory-btn').removeClass('correct wrong');
     
@@ -403,13 +405,11 @@ function cleanupOverlayElements() {
         'background': 'transparent'
     });
     
-    // never the controls HUD; and transparent ('rgba(0, 0, 0, 0)') is not an overlay -
-    // this used to delete #mg-controls, so the keycaps vanished after one verbal memory game
-    $('body > div:not(.game-container):not(.audio-elements):not(#mg-controls)').each(function() {
+    $('body > div:not(.game-container):not(.audio-elements)').each(function() {
         const $this = $(this);
-        const bg = $this.css('background-color') || '';
-        if ($this.css('display') !== 'none' &&
-            bg.includes('rgba') && !/,\s*0\)$/.test(bg)) {
+        if ($this.css('display') !== 'none' && 
+            $this.css('background-color') && 
+            $this.css('background-color').includes('rgba')) {
             console.log('Removing potential overlay element:', $this);
             $this.remove();
         }

@@ -1,5 +1,5 @@
 // -- Glitch Minigames
-// -- Copyright (C) 2024-2026 Glitch Studios
+// -- Copyright (C) 2024 Glitch
 // -- 
 // -- This program is free software: you can redistribute it and/or modify
 // -- it under the terms of the GNU General Public License as published by
@@ -288,8 +288,7 @@ let aimTestGame = {
     endGame: function(success) {
         if (!this.active) return;
         this.active = false;
-
-        playSoundSafe(success ? 'sound-success' : 'sound-failure');
+        
         clearInterval(this.timerInterval);
         clearTimeout(this.targetTimeout);
         $('.aim-test-area').off('click.aimtest');
@@ -314,7 +313,7 @@ let aimTestGame = {
                 $('.aim-test-area').empty();
             });
             
-            $.post('https://' + GetParentResourceName() + '/aimTestResult', JSON.stringify({ 
+            $.post('https://glitch-minigames/aimTestResult', JSON.stringify({ 
                 success: success,
                 targetsHit: self.targetsHit,
                 targetsMissed: self.targetsMissed
@@ -333,7 +332,7 @@ let aimTestGame = {
         }
         $('#aim-test-container').hide();
         $('.aim-test-area').empty();
-        $.post('https://' + GetParentResourceName() + '/aimTestClose', JSON.stringify({}));
+        $.post('https://glitch-minigames/aimTestClose', JSON.stringify({}));
     }
 };
 

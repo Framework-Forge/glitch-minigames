@@ -1,5 +1,5 @@
 // -- Glitch Minigames
-// -- Copyright (C) 2024-2026 Glitch Studios
+// -- Copyright (C) 2024 Glitch
 // -- 
 // -- This program is free software: you can redistribute it and/or modify
 // -- it under the terms of the GNU General Public License as published by
@@ -57,8 +57,8 @@ let balanceGame = {
         this.setupDisplay();
         this.setupKeyListeners();
         
-        $('.balance-status').text('READY').removeClass('danger warning').addClass('ready');
-        $('.balance-instruction').text('Lean either way to begin stabilization - keep the needle balanced!');
+        $('.balance-status').text('PRESS Q OR E').removeClass('danger warning').addClass('ready');
+        $('.balance-instruction').text('Press Q or E to begin stabilization - keep the needle balanced!');
     },
     
     beginGame: function() {
@@ -67,7 +67,7 @@ let balanceGame = {
         
         console.log('[Balance] Game started by player input');
         
-        $('.balance-instruction').text('Keep the needle balanced - don\'t let it fall into the red zones!');
+        $('.balance-instruction').text('Keep the needle balanced by pressing Q and E - don\'t let it fall into the red zones!');
         $('.balance-status').text('STABLE').removeClass('ready').addClass('safe');
         
         this.startTimer();
@@ -296,8 +296,7 @@ let balanceGame = {
         if (!this.active) return;
         this.active = false;
         this.started = false;
-
-        playSoundSafe(success ? 'sound-success' : 'sound-failure');
+        
         clearInterval(this.timerInterval);
         clearInterval(this.gameInterval);
         $(document).off('keydown.balance keyup.balance');
@@ -315,7 +314,7 @@ let balanceGame = {
                 $('.balance-danger-fill').css('width', '0%');
             });
             
-            $.post('https://' + GetParentResourceName() + '/balanceResult', JSON.stringify({ success: success }));
+            $.post('https://glitch-minigames/balanceResult', JSON.stringify({ success: success }));
         }, 1500);
     },
     
@@ -326,7 +325,7 @@ let balanceGame = {
         clearInterval(this.gameInterval);
         $(document).off('keydown.balance keyup.balance');
         $('#balance-container').hide();
-        $.post('https://' + GetParentResourceName() + '/balanceClose', JSON.stringify({}));
+        $.post('https://glitch-minigames/balanceClose', JSON.stringify({}));
     }
 };
 

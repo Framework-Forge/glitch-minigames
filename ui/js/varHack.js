@@ -1,5 +1,5 @@
 // -- Glitch Minigames
-// -- Copyright (C) 2024-2026 Glitch Studios
+// -- Copyright (C) 2024 Glitch
 // -- 
 // -- This program is free software: you can redistribute it and/or modify
 // -- it under the terms of the GNU General Public License as published by
@@ -22,10 +22,7 @@ const varHackState = {
     order: 1,
     gameStarted: false,
     gamePlaying: false,
-    timerInterval: null,
-    introTimeout: null,
-    playTimeout: null,
-    session: 0                   // bumped on every start / reset; stale callbacks compare against it
+    timerInterval: null
 };
 
 function startVarHack(config = {}) {
@@ -41,7 +38,6 @@ function startVarHack(config = {}) {
     varHackState.order = 1;
     varHackState.gameStarted = false;
     varHackState.gamePlaying = false;
-    const session = ++varHackState.session;
     
     $('#var-hack-container').show();
     
@@ -54,13 +50,9 @@ function startVarHack(config = {}) {
     
     console.log('Splash screen shown, waiting 3 seconds...');
     
-    varHackState.introTimeout = setTimeout(() => {
-        varHackState.introTimeout = null;
+    setTimeout(() => {
         console.log('Initializing game elements...');
         $('.var-splash').fadeOut(400, () => {
-            // closed or restarted while the splash faded out (this used to check the
-            // gameStarted/gamePlaying flags, which are always false here, so the game never began)
-            if (session !== varHackState.session) return;
             initializeGame();
             $('.var-groups').fadeIn(400);
         });
@@ -193,10 +185,12 @@ function gameLost() {
 function startTimer() {
     console.log('Starting timer sequence');
 
-    varHackState.playTimeout = setTimeout(() => {
-        varHackState.playTimeout = null;
-        if (!varHackState.gameStarted) return;
+    setTimeout(() => {
         console.log('Starting gameplay phase...');
+        // 'playing' hides the digit, 'plain' neutralizes the per-number colours
+        // so blocks can't be identified by hue. Clear the text outright so the
+        // hidden number can't be revealed by drag-selecting it (logic uses
+        // data-number, not the visible text).
         $('.var-groups').addClass('playing plain');
         $('.var-group').text('');
         varHackState.gamePlaying = true;
@@ -245,8 +239,20 @@ window.addEventListener('message', (event) => {
         startVarHack(event.data.config);
     } else if (event.data.action === 'endVarHack' || event.data.action === 'forceClose') {
         console.log('Forced close of VAR hack:', event.data);
+        if (varHackState.timerInterval) {
+            clearInterval(varHackState.timerInterval);
+            varHackState.timerInterval = null;
+        }
+        
+        varHackState.gameStarted = false;
+        varHackState.gamePlaying = false;
+        
+        $.post(`https://${GetParentResourceName()}/varHackResult`, JSON.stringify({ 
+            success: false
+        }));
+        
+        $('#var-hack-container').fadeOut();
         resetGame();
-        $('#var-hack-container').hide();
     }
 });
 
@@ -255,23 +261,14 @@ function resetGame() {
         clearInterval(varHackState.timerInterval);
         varHackState.timerInterval = null;
     }
-    if (varHackState.introTimeout) {
-        clearTimeout(varHackState.introTimeout);
-        varHackState.introTimeout = null;
-    }
-    if (varHackState.playTimeout) {
-        clearTimeout(varHackState.playTimeout);
-        varHackState.playTimeout = null;
-    }
-
+    
     varHackState.order = 1;
     varHackState.gameStarted = false;
     varHackState.gamePlaying = false;
-    varHackState.session++;
-
-    $('.var-groups').stop(true, true).empty();
-    $('.var-groups').removeClass('playing plain');
-    $('.var-group').stop(true, true).removeClass('good bad');
+    
+    $('.var-groups').empty();
+    $('.var-groups').removeClass('playing');
+    $('.var-group').removeClass('good bad');
     
     $('#var-message').text('Memorize the pattern');
     $('.var-timer-progress').css('width', '100%');

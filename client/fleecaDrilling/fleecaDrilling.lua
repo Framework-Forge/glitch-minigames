@@ -1,5 +1,5 @@
 -- Glitch Minigames
--- Copyright (C) 2024-2026 Glitch Studios
+-- Copyright (C) 2024 Glitch
 -- 
 -- This program is free software: you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@ Drilling = {}
 
 Drilling.DisabledControls = {
     30, 31, -- Movement & Cover
-    199, 200, -- Pause Menu (P and ESC): ESC cancels the drill instead
+    199, -- Pause Menu
     24, 25, 140, 141, 142, 143, -- Attack Controls
     22, -- Space
     36, -- Enter
@@ -26,29 +26,7 @@ Drilling.DisabledControls = {
     37, 38, 169, 170, -- Weapon select
 }
 
-local DrillPropHandle = nil
--- 'drill' (Fleeca drill, default) or 'jackhammer' (the construction jackhammer
--- scenario: the ped holds and works a jackhammer instead). Per game, from
--- StartDrilling({ anim = 'jackhammer' }).
-local AnimStyle = 'drill'
-local JACKHAMMER_SCENARIO = 'WORLD_HUMAN_CONST_DRILL'
-local JACKHAMMER_PROP = `prop_tool_jackham`
-
--- The scenario's jackhammer can be left in the hands or on the ground when
--- the task ends: removed (only ours, within 3 m of the player)
-local function RemoveJackhammer()
-    local ped = PlayerPedId()
-    local c = GetEntityCoords(ped)
-    for _ = 1, 3 do
-        local obj = GetClosestObjectOfType(c.x, c.y, c.z, 3.0, JACKHAMMER_PROP, false, false, false)
-        if obj == 0 then break end
-        if IsEntityAttachedToEntity(obj, ped) then DetachEntity(obj, true, true) end
-        SetEntityAsMissionEntity(obj, true, true)
-        DeleteObject(obj)
-        if DoesEntityExist(obj) then DeleteEntity(obj) end
-    end
-end
-local loadDrillSound -- local, defined below (shared with plasma drilling as Drilling.LoadSound)
+DrillPropHandle = nil
 local soundId = nil
 local soundPlaying = false
 local drillSound = nil
@@ -61,15 +39,6 @@ local animationSequenceComplete = false
 local triggeredPinBreaks = {}
 local maxDrillDepth = 0.0
 
--- Drill tuning. A full run at a sensible speed (0.3-0.5) takes about 20-25s,
--- including the pauses needed to lift the bit and let it cool.
-local DRILL_SLIDE_RATE     = 0.25  -- depth/s moving through the hole already drilled
-local DRILL_CUT_RATE       = 0.15  -- depth/s cut per unit of drill speed
-local DRILL_HEAT_PER_DEPTH = 8.0   -- heat per depth cut, times drill speed
-local DRILL_COOL_LIFTED    = 0.25  -- heat/s lost with the bit lifted off the metal
-local DRILL_COOL_RESTING   = 0.04  -- heat/s lost while resting on the bottom
-local DRILL_LIFT_GAP       = 0.01  -- how far above the bottom counts as lifted
-
 local pinBreakPoints = {
     {min = 0.29, max = 0.305},
     {min = 0.50, max = 0.51},
@@ -77,14 +46,21 @@ local pinBreakPoints = {
     {min = 0.78, max = 0.79}
 }
 
--- Result popups through glitch-notifications (config.usingGlitchNotifications, optional)
-local function notify(title, text, colour)
-    if config.usingGlitchNotifications and GetResourceState('glitch-notifications') == 'started' then
-        exports['glitch-notifications']:ShowNotification(Minigames.T(title), Minigames.T(text), 3000, colour, false)
+local function requestModel(modelName)
+    local modelHash = GetHashKey(modelName)
+    RequestModel(modelHash)
+    local startTime = GetGameTimer()
+    while not HasModelLoaded(modelHash) do
+        Citizen.Wait(0)
+        if GetGameTimer() - startTime > 5000 then
+            print("Failed to load model: " .. modelName)
+            break
+        end
     end
+    return modelHash
 end
 
-loadDrillSound = function()
+function loadDrillSound()
     RequestScriptAudioBank("DLC_HEIST_FLEECA_SOUNDSET", false)
     RequestScriptAudioBank("DLC_MPHEIST/HEIST_FLEECA_DRILL", false)
     RequestScriptAudioBank("DLC_MPHEIST/HEIST_FLEECA_DRILL_2", false)
@@ -99,15 +75,11 @@ loadDrillSound = function()
     PrepareAlarm("HEIST_FLEECA_DRILL_2")
 end
 
-Drilling.LoadSound = loadDrillSound
-
 local function createAndAttachDrill()
-    local modelHash = `hei_prop_heist_drill`
-    if not Minigames.LoadModel(modelHash) then return nil end
+    local modelHash = requestModel("hei_prop_heist_drill")
     local playerPed = PlayerPedId()
     
     local prop = CreateObject(modelHash, 1.0, 1.0, 1.0, true, true, false)
-    SetModelAsNoLongerNeeded(modelHash)
     SetCurrentPedWeapon(playerPed, GetHashKey("WEAPON_UNARMED"), true)
     
     local boneIndex = GetPedBoneIndex(playerPed, 28422)
@@ -141,28 +113,19 @@ end
 
 local function playDrillingSequence(callback)
     local playerPed = PlayerPedId()
-
-    if AnimStyle == 'jackhammer' then
-        -- the scenario brings its own jackhammer prop and loops the animation
-        SetCurrentPedWeapon(playerPed, `WEAPON_UNARMED`, true)
-        TaskStartScenarioInPlace(playerPed, JACKHAMMER_SCENARIO, 0, true)
-        Wait(1500)
-        setupDrillingCamera()
-        animationSequenceComplete = true
-        if callback then callback() end
-        return
+    
+    RequestAnimDict("anim@heists@fleeca_bank@drilling")
+    while not HasAnimDictLoaded("anim@heists@fleeca_bank@drilling") do
+        Wait(10)
     end
-    Minigames.LoadAnimDict("anim@heists@fleeca_bank@drilling")
     
     TaskPlayAnim(playerPed, "anim@heists@fleeca_bank@drilling", "drill_straight_start", 
         8.0, -8.0, -1, 0, 0, false, false, false)
     
     Wait(1500)
     
-    -- Drilling.Init already attached the drill; only make one if that failed or it is gone
-    if not (DrillPropHandle and DoesEntityExist(DrillPropHandle)) then
-        DrillPropHandle = createAndAttachDrill()
-    end
+    local prop = createAndAttachDrill()
+    DrillPropHandle = prop
     
     TaskPlayAnim(playerPed, "anim@heists@fleeca_bank@drilling", "drill_straight_idle", 
         8.0, -8.0, -1, 1, 0, false, false, false)
@@ -177,15 +140,12 @@ local function playDrillingSequence(callback)
 end
 
 Drilling.Init = function()
-    -- (the jackhammer comes with its scenario: no drill prop)
-    if AnimStyle ~= 'jackhammer' then
-        local prop = createAndAttachDrill()
-        if not prop then
-            print('^3[glitch-minigames] drill prop could not be created^7')
-            return false
-        end
-        DrillPropHandle = prop
+    local prop = createAndAttachDrill()
+    if not prop then
+        print("Failed to create drill prop")
+        return false
     end
+    DrillPropHandle = prop
     
     FreezeEntityPosition(PlayerPedId(), true)
     
@@ -210,7 +170,7 @@ Drilling.Init = function()
         if HasScaleformMovieLoaded(scaleform) then
             break
         else
-            Minigames.Debug(('DRILLING scaleform attempt %d/%d did not load'):format(attempts + 1, maxAttempts))
+            print(string.format("Attempt %d/%d: Failed to load DRILLING scaleform", attempts + 1, maxAttempts))
             if scaleform then
                 SetScaleformMovieAsNoLongerNeeded(scaleform)
             end
@@ -220,7 +180,7 @@ Drilling.Init = function()
     end
     
     if not scaleform or not HasScaleformMovieLoaded(scaleform) then
-        print(('^3[glitch-minigames] DRILLING scaleform did not load after %d attempts^7'):format(maxAttempts))
+        print("Failed to load DRILLING scaleform after " .. maxAttempts .. " attempts")
         Drilling.ClearDrillProp()
         return false
     end
@@ -242,10 +202,19 @@ Drilling.Init = function()
 end
 
 Drilling.LoadAnimations = function()
-    Minigames.LoadAnimDict("anim@heists@fleeca_bank@drilling")
+    RequestAnimDict("anim@heists@fleeca_bank@drilling")
+    
+    local startTime = GetGameTimer()
+    while not HasAnimDictLoaded("anim@heists@fleeca_bank@drilling") do
+        Wait(10)
+        if GetGameTimer() - startTime > 5000 then
+            print("Failed to load animation: anim@heists@fleeca_bank@drilling")
+            break
+        end
+    end
 end
 
-Drilling.ClearDrillProp = function(soft)
+Drilling.ClearDrillProp = function()
     if DrillPropHandle and DoesEntityExist(DrillPropHandle) then
         DetachEntity(DrillPropHandle, true, true)
         DeleteObject(DrillPropHandle)
@@ -257,21 +226,17 @@ Drilling.ClearDrillProp = function(soft)
         
         DrillPropHandle = nil
     end
-
-    if soft then
-        if AnimStyle == 'jackhammer' then RemoveJackhammer() end
-        return
+    
+    ClearPedTasks(PlayerPedId())
+    local playerPed = PlayerPedId()
+    local attachedObjects = GetGamePool('CObject')
+    for _, obj in ipairs(attachedObjects) do
+        if IsEntityAttachedToEntity(obj, playerPed) then
+            DetachEntity(obj, true, true)
+            DeleteObject(obj)
+        end
     end
-
-    if AnimStyle == 'jackhammer' then
-        ClearPedTasksImmediately(PlayerPedId())
-        RemoveJackhammer()
-    else
-        ClearPedTasks(PlayerPedId())
-    end
-    -- only the props this resource created are removed (DrillPropHandle above, the
-    -- scenario jackhammer in RemoveJackhammer); other resources' attached props stay
-
+    
     if cameraHandle then
         DestroyCam(cameraHandle, false)
         RenderScriptCams(false, false, 0, true, true)
@@ -298,14 +263,19 @@ Drilling.Start = function(callback)
         
         loadDrillSound()
         
-        -- controls are shown by the controls HUD (client/core/controls.lua)
+        if config.usingGlitchNotifications then 
+            DrillingControls = exports['glitch-notifications']:ShowNotification(
+                'Drilling Controls',
+                'W/S - Move Drill Up/Down\nQ - Slow Down\nE - Speed Up\nESC - Cancel',
+                0,
+                '#ff9f1c',
+                false
+            )
+        end
         
         playDrillingSequence(function()
             Drilling.Update(callback)
         end)
-    elseif callback then
-        -- Already drilling: fail this call instead of leaving the caller waiting forever
-        callback(false)
     end
 end
 
@@ -316,37 +286,23 @@ end
 Drilling.Update = function(callback)
     local lastSoundRefresh = GetGameTimer()
     
-    local startHealth = GetEntityHealth(PlayerPedId())
     while Drilling.Active do
         Drilling.Draw()
         Drilling.DisableControls()
-        -- a script error in here used to kill the loop and leave the player frozen
-        -- with the drill in their hands: end the game as a fail instead
-        local okControls, err = pcall(Drilling.HandleControls)
-        if not okControls then
-            print('^1[glitch-minigames] drilling error: ' .. tostring(err) .. '^7')
-            Drilling.Active = false
-            Drilling.Result = false
-            break
-        end
-
-        -- hurt (shot, hit, set on fire): the drill is dropped, the game fails
-        if GetEntityHealth(PlayerPedId()) < startHealth then
-            Minigames.Debug('drilling cancelled: player was hurt')
-            Drilling.Active = false
-            Drilling.Result = false
-            break
-        end
+        Drilling.HandleControls()
         
         if IsEntityDead(PlayerPedId()) then
-            Minigames.Debug('drilling cancelled: player died')
+            print("Drilling cancelled - player died")
             Drilling.Active = false
             Drilling.Result = false
+            
+            if config.usingGlitchNotifications then
+                exports['glitch-notifications']:RemoveNotification(DrillingControls)
+            end
             
             if soundPlaying then
                 StopSound(drillSound)
                 ReleaseSoundId(drillSound)
-                drillSound = nil
                 soundPlaying = false
                 isDrillingMetal = false
             end
@@ -357,17 +313,23 @@ Drilling.Update = function(callback)
             break
         end
         
+        if GetGameTimer() - lastSoundRefresh > 10000 and soundPlaying then
+            loadDrillSound()
+            lastSoundRefresh = GetGameTimer()
+        end
         
-        if IsDisabledControlJustPressed(0, 200) then
+        if IsControlJustPressed(0, 200) then
             Drilling.Active = false
             Drilling.Result = false
             
-            notify('Cancelled', 'Drilling cancelled', '#ffaa00')
+            if config.usingGlitchNotifications then
+                exports['glitch-notifications']:ShowNotification('Cancelled', 'Drilling cancelled', 3000, '#ffaa00', false)
+                exports['glitch-notifications']:RemoveNotification(DrillingControls)
+            end
             
             if soundPlaying then
                 StopSound(drillSound)
                 ReleaseSoundId(drillSound)
-                drillSound = nil
                 soundPlaying = false
                 isDrillingMetal = false
             end
@@ -382,10 +344,13 @@ Drilling.Update = function(callback)
     
     Drilling.ClearDrillProp()
 
+    if config.usingGlitchNotifications then
+        exports['glitch-notifications']:RemoveNotification(DrillingControls)
+    end
+    
     if soundPlaying then
         StopSound(drillSound)
         ReleaseSoundId(drillSound)
-        drillSound = nil
         soundPlaying = false
         isDrillingMetal = false
     end
@@ -398,23 +363,13 @@ Drilling.Update = function(callback)
         RenderScriptCams(false, false, 500, true, true)
         cameraHandle = nil
     end
-
-    -- release the DRILLING movie as soon as the run is over
-    if Drilling.Scaleform then
-        Scaleforms.UnloadMovie(Drilling.Scaleform)
-        Drilling.Scaleform = nil
-    end
-
+    
     local playerPed = PlayerPedId()
-    if AnimStyle == 'jackhammer' then
-        ClearPedTasksImmediately(playerPed)
-        RemoveJackhammer()
-    else
-        TaskPlayAnim(playerPed, "anim@heists@fleeca_bank@drilling", "drill_straight_end",
-            8.0, -8.0, -1, 0, 0, false, false, false)
-        Wait(1500)
-    end
-
+    TaskPlayAnim(playerPed, "anim@heists@fleeca_bank@drilling", "drill_straight_end", 
+        8.0, -8.0, -1, 0, 0, false, false, false)
+    
+    Wait(1500)
+    
     callback(Drilling.Result)
 end
 
@@ -422,22 +377,14 @@ Drilling.HandleControls = function()
     local last_pos = Drilling.DrillPos
     local last_speed = Drilling.DrillSpeed
     
-    -- W - Move drill down. Inside the hole already drilled the bit slides freely;
-    -- at the bottom it only cuts while spinning (speed > 0.1), at a rate set by the
-    -- drill speed. Heat is added per depth cut (see below), so tapping W cuts and
-    -- heats exactly like holding it - spamming W gains nothing.
-    local cutting = false
-    if IsControlPressed(0, 32) then
-        if IsControlJustPressed(0, 32) and last_pos == 0.0 then
-            PlaySoundFromEntity(drillSound or -1, "Drill_Power_Up", PlayerPedId(), "DLC_HEIST_FLEECA_SOUNDSET", true, 0)
+    if IsControlJustPressed(0, 32) then
+        Drilling.DrillPos = math.min(1.0, Drilling.DrillPos + 0.005)
+        if last_pos == 0.0 then
+            PlaySoundFromEntity(drillSound, "Drill_Power_Up", PlayerPedId(), "DLC_HEIST_FLEECA_SOUNDSET", true, 0)
         end
-        local dt = GetFrameTime()
-        if Drilling.DrillPos < Drilling.HoleDepth then
-            Drilling.DrillPos = math.min(Drilling.HoleDepth, Drilling.DrillPos + DRILL_SLIDE_RATE * dt)
-        elseif Drilling.DrillSpeed > 0.1 then
-            Drilling.DrillPos = math.min(1.0, Drilling.DrillPos + DRILL_CUT_RATE * Drilling.DrillSpeed * dt)
-            cutting = true
-        end
+    elseif IsControlPressed(0, 32) then
+        local speedFactor = 0.06 * GetFrameTime() / (math.max(0.1, Drilling.DrillTemp) * 10)
+        Drilling.DrillPos = math.min(1.0, Drilling.DrillPos + speedFactor)
     end
     
     -- S key - Move drill up
@@ -461,36 +408,47 @@ Drilling.HandleControls = function()
         Drilling.DrillSpeed = math.min(0.6, Drilling.DrillSpeed + (0.2 * GetFrameTime())) -- Reduced acceleration rate
     end
     
-    -- One looping GTA drill sound for the whole run. Its DrillState variable
-    -- switches it between spinning free (0.0) and cutting into metal (1.0); it is
-    -- restarted if the game ever drops it, so the audio never cuts out.
     if Drilling.DrillSpeed > 0 and Drilling.Active then
-        if not soundPlaying or (drillSound and HasSoundFinished(drillSound)) then
+        if not soundPlaying then
             if drillSound and drillSound ~= -1 then
                 StopSound(drillSound)
                 ReleaseSoundId(drillSound)
-                drillSound = nil
             end
+            
             drillSound = GetSoundId()
             if drillSound ~= -1 then
                 PlaySoundFromEntity(drillSound, "Drill", PlayerPedId(), "DLC_HEIST_FLEECA_SOUNDSET", true, 0)
                 ShakeGameplayCam("ROAD_VIBRATION_SHAKE", Drilling.DrillSpeed * 0.5)
                 soundPlaying = true
+                isDrillingMetal = false
             end
         end
-        local inMetal = cutting
-        if drillSound and drillSound ~= -1 then
-            SetVariableOnSound(drillSound, "DrillState", inMetal and 1.0 or 0.0)
-        end
-        if inMetal ~= isDrillingMetal then
-            ShakeGameplayCam("ROAD_VIBRATION_SHAKE", inMetal and math.min(0.8, Drilling.DrillSpeed) or Drilling.DrillSpeed * 0.5)
-            isDrillingMetal = inMetal
+        
+        if Drilling.DrillPos > Drilling.HoleDepth and Drilling.DrillSpeed > 0.1 then
+            if not isDrillingMetal then
+                StopSound(drillSound)
+                drillSound = GetSoundId()
+                if drillSound ~= -1 then
+                    PlaySoundFromEntity(drillSound, "Drill_Off_Sweet_Spot_01", PlayerPedId(), "DLC_MPHEIST/HEIST_FLEECA_DRILL", true, 5)
+                    ShakeGameplayCam("ROAD_VIBRATION_SHAKE", math.min(0.8, Drilling.DrillSpeed * 1.0))
+                    isDrillingMetal = true
+                end
+            end
+        else
+            if isDrillingMetal then
+                StopSound(drillSound)
+                drillSound = GetSoundId()
+                if drillSound ~= -1 then
+                    PlaySoundFromEntity(drillSound, "Drill_In_Metal_01", PlayerPedId(), "DLC_MPHEIST/HEIST_FLEECA_DRILL_2", true, 5)
+                    ShakeGameplayCam("ROAD_VIBRATION_SHAKE", Drilling.DrillSpeed * 0.5)
+                    isDrillingMetal = false
+                end
+            end
         end
     else
         if soundPlaying then
             StopSound(drillSound)
             ReleaseSoundId(drillSound)
-            drillSound = nil
             StopGameplayCamShaking(true)
             soundPlaying = false
             isDrillingMetal = false
@@ -511,6 +469,9 @@ Drilling.HandleControls = function()
     local currentTime = GetGameTimer()
     for i, point in ipairs(pinBreakPoints) do
         if Drilling.DrillPos >= point.min and Drilling.DrillPos <= point.max and lastDrillPos < point.min and not triggeredPinBreaks[i] and Drilling.DrillPos > maxDrillDepth and currentTime - pinHitTimestamp > 1000 then
+            if not HasSoundFinished(-1) then
+                StopSound(-1)
+            end
             
             if i <= 4 then -- 2
                 PlaySoundFrontend(-1, "Drill_Pin_Break", "DLC_HEIST_FLEECA_SOUNDSET", true)
@@ -521,9 +482,11 @@ Drilling.HandleControls = function()
             
             triggeredPinBreaks[i] = true
             
-            notify('Warning', 'Pin break detected!', '#ffaa00')
+            if config.usingGlitchNotifications then
+                exports['glitch-notifications']:ShowNotification('Warning', 'Pin break detected!', 2000, '#ffaa00', false)
+            end
             
-            Minigames.Debug(('pin %d break at depth %.3f'):format(i, Drilling.DrillPos))
+            print("Pin " .. i .. " break triggered at depth: " .. Drilling.DrillPos)
         end
     end
     
@@ -531,18 +494,19 @@ Drilling.HandleControls = function()
         maxDrillDepth = Drilling.DrillPos
     end
     
-    -- Heat: cutting heats by the depth gained (faster spin = more heat per depth).
-    -- It only cools properly with the bit lifted off the metal (S); resting on the
-    -- bottom barely cools it, so letting go of W between taps does not reset heat.
-    local dt = GetFrameTime()
-    if cutting then
-        local gained = Drilling.DrillPos - last_pos
-        Drilling.DrillTemp = math.min(1.0, Drilling.DrillTemp + gained * DRILL_HEAT_PER_DEPTH * Drilling.DrillSpeed)
-        Drilling.HoleDepth = Drilling.DrillPos
-    elseif Drilling.DrillPos < Drilling.HoleDepth - DRILL_LIFT_GAP then
-        Drilling.DrillTemp = math.max(0.0, Drilling.DrillTemp - DRILL_COOL_LIFTED * dt)
+    if Drilling.DrillPos > Drilling.HoleDepth then
+        if Drilling.DrillSpeed > 0.1 then
+            local heatRate = (1.0 * GetFrameTime()) * Drilling.DrillSpeed
+            if Drilling.DrillSpeed > 0.7 then
+                heatRate = heatRate * 1.5
+            end
+            Drilling.DrillTemp = math.min(1.0, Drilling.DrillTemp + heatRate)
+            Drilling.HoleDepth = Drilling.DrillPos
+        else
+            Drilling.DrillPos = Drilling.HoleDepth
+        end
     else
-        Drilling.DrillTemp = math.max(0.0, Drilling.DrillTemp - DRILL_COOL_RESTING * dt)
+        Drilling.DrillTemp = math.max(0.0, Drilling.DrillTemp - (0.8 * GetFrameTime()))
     end
     
     if Drilling.DrillTemp >= 1.0 then
@@ -552,7 +516,6 @@ Drilling.HandleControls = function()
         if soundPlaying then
             StopSound(drillSound)
             ReleaseSoundId(drillSound)
-            drillSound = nil
             soundPlaying = false
             isDrillingMetal = false
         end
@@ -561,14 +524,15 @@ Drilling.HandleControls = function()
         FreezeEntityPosition(PlayerPedId(), false)
         Drilling.ClearDrillProp()
         
-        notify('Failed', 'Drill overheated!', '#ff0000')
+        if config.usingGlitchNotifications then
+            exports['glitch-notifications']:ShowNotification('Failed', 'Drill overheated!', 3000, '#ff0000', false)
+            exports['glitch-notifications']:RemoveNotification(DrillingControls)
+        end
 
         PlaySoundFrontend(-1, "Drill_Heat_Failure", "DLC_HEIST_FLEECA_SOUNDSET", true)
         
-        -- late safety net: only our own prop (soft). A full clear here wiped the props
-        -- and anims the calling script had started since (heist drill progress)
         Citizen.SetTimeout(2000, function()
-            Drilling.ClearDrillProp(true)
+            Drilling.ClearDrillProp()
         end)
 
     elseif Drilling.DrillPos >= 0.975 then
@@ -578,7 +542,6 @@ Drilling.HandleControls = function()
         if soundPlaying then
             StopSound(drillSound)
             ReleaseSoundId(drillSound)
-            drillSound = nil
             soundPlaying = false
             isDrillingMetal = false
         end
@@ -587,14 +550,15 @@ Drilling.HandleControls = function()
         FreezeEntityPosition(PlayerPedId(), false)
         Drilling.ClearDrillProp()
         
-        notify('Success', 'Successfully drilled!', '#00ff00')
+        if config.usingGlitchNotifications then
+            exports['glitch-notifications']:ShowNotification('Success', 'Successfully drilled!', 3000, '#00ff00', false)
+            exports['glitch-notifications']:RemoveNotification(DrillingControls)
+        end
 
         PlaySoundFrontend(-1, "Drill_Pin_Break", "DLC_HEIST_FLEECA_SOUNDSET", true)
         
-        -- late safety net: only our own prop (soft). A full clear here wiped the props
-        -- and anims the calling script had started since (heist drill progress)
         Citizen.SetTimeout(2000, function()
-            Drilling.ClearDrillProp(true)
+            Drilling.ClearDrillProp()
         end)
     end
     
@@ -603,39 +567,15 @@ Drilling.HandleControls = function()
     lastDrillPos = Drilling.DrillPos
 end
 
--- Resource stop mid-drill: stop the sound, drop the drill and give control back
-Drilling.StopNow = function()
-    if not Drilling.Active then return end
-    Drilling.Active = false
-    Drilling.Result = false
-    if soundPlaying then
-        StopSound(drillSound)
-        ReleaseSoundId(drillSound)
-        drillSound = nil
-        soundPlaying = false
-    end
-    StopGameplayCamShaking(true)
-    FreezeEntityPosition(PlayerPedId(), false)
-    Drilling.ClearDrillProp()
-    if Drilling.Scaleform then
-        SetScaleformMovieAsNoLongerNeeded(Drilling.Scaleform)
-        Drilling.Scaleform = nil
-    end
-end
-
 Drilling.DisableControls = function()
     for _, control in ipairs(Drilling.DisabledControls) do
         DisableControlAction(0, control, true)
     end
 end
 
--- opts (optional): { anim = 'jackhammer' } works a jackhammer instead of the drill
-exports('StartDrilling', function(opts)
+exports('StartDrilling', function()
     local p = promise.new()
-    if not Drilling.Active then
-        AnimStyle = (type(opts) == 'table' and opts.anim == 'jackhammer') and 'jackhammer' or 'drill'
-    end
-
+    
     Drilling.Start(function(success)
         if type(success) ~= "boolean" then
             success = false
@@ -647,12 +587,9 @@ exports('StartDrilling', function(opts)
     return result
 end)
 
--- Lock watchdog (client/core/client.lua): end a stuck drill as a fail
-Minigames.OnRelease(Drilling.StopNow)
-
 if config.DebugCommands then 
     RegisterCommand('testdrill', function()
-        local success = exports[GetCurrentResourceName()]:StartDrilling()
-        print('[testdrill] result: ' .. tostring(success))
+        local success = exports['glitch-minigames']:StartDrilling()
+        print("Drilling complete! Result: " .. tostring(success))
     end)
 end

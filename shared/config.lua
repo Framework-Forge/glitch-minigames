@@ -1,5 +1,5 @@
 -- Glitch Minigames
--- Copyright (C) 2024-2026 Glitch Studios
+-- Copyright (C) 2024 Glitch
 -- 
 -- This program is free software: you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
@@ -16,200 +16,24 @@
 
 config = {}
 
-config.DebugCommands = false -- Testing only. true = anyone can run /testall, /testdrill etc. (and earn XP with them).
-config.DebugPrints = false -- true = chatty client console output (F8) and the NUI console.log output (devtools). Off keeps both quiet.
-config.usingGlitchNotifications = false -- true = result popups (success / failed / cancelled) through glitch-notifications when it is running.
-config.NotifyColour = '#A855F7'         -- accent colour of glitch-notifications popups (perk messages, results)
-
--- Server: report this resource's net events (counts and malformed arguments) to
--- glitch-poolcleaning (Glitch Studios anticheat) when that resource is installed.
--- Nothing from it is loaded here, and without it nothing happens (server/guard.lua).
-config.NetGuard = true
+config.DebugCommands = false -- This is for testing purposes only. Set to true to enable debug commands.
+config.DebugPrints = false -- Set to true to show minigame console.log output in the UI (F8/devtools). Off keeps the console quiet.
+config.usingGlitchNotifications = false -- Forge: the calling script notifies through pr_bridge; glitch-notifications is not installed.
 
 -- Keys that close/cancel any active minigame (returns a fail result to the calling script).
 -- Supported names: 'BACKSPACE', 'ESCAPE', 'ENTER'. Defaults to both BACKSPACE and ESCAPE.
 config.CancelKeys = { 'BACKSPACE', 'ESCAPE' }
 
--- Key that mutes / unmutes minigame sounds in the full-screen games (shown in the keycap HUD).
--- The choice is remembered on the player's client. Supported: 'TAB' (default), 'CAPS', 'M'
--- ('M' clashes with letter input in Keys / Word Crack / Backdoor Sequence).
-config.MuteKey = 'TAB'
-
--- Player-facing text (translations / rewording). The resource is written in English;
--- add an entry to replace one string, keyed by the exact English text. It covers the
--- Lua side (notifications, help text, controls HUD titles and labels, the Brute Force
--- and Data Crack screen text) and the game
--- panels: the NUI swaps any element whose whole text matches a key. Empty = English.
-config.Text = {
-    -- ['Cancel'] = 'Annuler',
-    -- ['Backdoor open - one more try'] = 'Porte derobee ouverte - encore un essai',
-    -- ['[BREACH IN PROGRESS]'] = '[INTRUSION EN COURS]',
-}
-
--- Brute Force: the words the player cracks, one picked at random per game. Exactly
--- 8 characters each (the HACKING_PC roulette has 8 columns); other lengths are skipped.
-config.BruteForcePasswords = {
-    'HACKME01', 'SECUREIT', 'PASSWORD', 'CYBERNET', 'ENCRYPTD', 'INTRUDER', 'BRUTE123', 'HACKING8',
-}
-
--- XP (glitch-xpSystem, optional)
--- Winning a minigame gives XP in the category below. Nothing here is needed when no XP
--- resource from Resources is running: games then work without XP or perks.
--- How XP is awarded (README: XP and perks), safest first:
---   * ClientReported = false: XP only through the server export AwardXP(src, game, won),
---     called by your own server script after it checked the result.
---   * RequireServerSession = true: the client reports the result, but only for a game
---     your server script opened with OpenXPSession(src, game) when the player reached
---     a real hack. A modified client cannot start a session on its own.
---   * ClientReported = true on its own (default): the client reports each wrapped game.
---     The server checks a one-time token, the minimum play time, the cooldown and the
---     hourly cap, but a modified client can still claim wins up to that cap. Fine when
---     hacking XP only unlocks hacking perks; switch to one of the above if it buys more.
-config.XP = {
-    Enabled = true,                -- false = minigames never touch the XP system
-    Resources = { 'glitch-xpSystem', 'glitch_xpSystem' }, -- first one started is used
-    Category = 'hacking',          -- must exist in glitch-xpSystem Config.Categories
-    FailXP = 0,                    -- XP for a failed attempt (0 = none)
-    ClientReported = true,         -- see above; false = XP only through the AwardXP server export
-    RequireServerSession = false,  -- see above; true = client results count only after OpenXPSession
-    MinDuration = 2,               -- seconds a game must run before a client-reported result counts
-    MinDurations = {               -- per game minimum (seconds), for the games no one can win faster
-        StartDrilling = 8,
-        StartPlasmaDrilling = 8,
-        StartBruteForce = 5,
-        StartDataCrack = 4,
-    },
-    Cooldown = 15,                 -- seconds between XP awards per player (stops farming)
-    MaxAwardsPerHour = 20,         -- XP awards per character per hour, both paths together
-
-    -- Hacking skill tree perks applied to the games (values from glitch-xpSystem GetEffect)
-    Perks = {
-        Enabled = true,
-        Time = 'hacking_time',         -- +seconds on the minigame timer
-        Mistakes = 'hacking_mistakes', -- +allowed mistakes / attempts / lives
-        Retry = 'hacking_retry',       -- automatic retries after a failed game
-        Keylogger = 'hacking_keylogger', -- a game won in the last 10 minutes runs with 1.5x the time
-        Skip = 'hacking_skip',         -- Zero day: skip one hack a day (needs CanUseDaily / UseDaily)
-    },
-
-    -- Zero day perk (Perks.Skip, once a day): never offered for games these resources start.
-    -- The default list is the Glitch Studios heist products. Replace it with your own heist
-    -- resources or set it to {}; names that are not installed are ignored.
-    -- A single call can also opt out with a trailing { noSkip = true } table.
-    ZeroDayNever = {
-        'glitch-casinoHeist', 'glitch-unionDepository', 'glitch-humaneHeist',
-        'glitch-yachtHeist', 'glitch-trainHeist', 'glitch-bankRobbery',
-    },
-    ZeroDaySeconds = 4,            -- how long the E to skip offer stays up
-
-    -- Games that give NO XP / perks / retry unless the caller asks for it with a trailing
-    -- { xp = true } options table, e.g. StartCircleClickGame(5, 1, 45, 3, 0.15, true, { 'W', 'A', 'S', 'D' }, 1, { xp = true })
-    OptIn = {
-        StartCircleClickGame = true,
-    },
-
-    -- XP per win, keyed by export name. Remove a game or set it to 0 to give no XP for it.
-    Games = {
-        StartFirewallPulse        = 35,
-        StartBackdoorSequence     = 35,
-        StartCircuitRhythm        = 35,
-        StartSurgeOverride        = 15,
-        StartVarHack              = 25,
-        StartMemoryGame           = 20,
-        StartSequenceMemoryGame   = 20,
-        StartVerbalMemoryGame     = 20,
-        StartNumberedSequenceGame = 20,
-        StartSymbolSearchGame     = 25,
-        StartPipePressureGame     = 25,
-        StartPairsGame            = 20,
-        StartMemoryColorsGame     = 20,
-        StartUntangleGame         = 25,
-        StartFingerprintGame      = 25,
-        StartCodeCrackGame        = 25,
-        StartWordCrackGame        = 25,
-        StartBalanceGame          = 15,
-        StartAimTestGame          = 15,
-        StartCircleClickGame      = 15,
-        StartLockpickGame         = 20,
-        StartBarHitGame           = 15,
-        StartSkillCheckGame       = 15,
-        StartNumberUpGame         = 15,
-        StartKeysGame             = 15,
-        StartComboInputGame       = 15,
-        StartHoldZoneGame         = 15,
-        StartWireConnectGame      = 20,
-        StartSimonSaysGame        = 20,
-        StartShapeRecallGame      = 20,
-        StartMemoryDiffGame       = 20,
-        StartTracerouteGame       = 25,
-        StartCarrierTuneGame      = 20,
-        StartBruteForce           = 35,
-        StartDataCrack            = 35,
-        StartCircuitBreaker       = 40,
-        runMiniGame               = 40,
-        runDefaultMiniGameFromDifficulty = 40,
-        runDefaultRandom          = 40,
-        StartDrilling             = 40,
-        StartPlasmaDrilling       = 40,
-    },
-}
-
--- Style: three separate defaults. Any export can override them for one game with
--- a trailing options table, e.g. StartPairsGame(4, 60000, 0, { colour = 'cyan', theme = 'tablet', keybinds = 'device' })
--- (see client/core/style.lua; colour can also be a table of colour overrides).
-
 -- Active Color Theme
-config.ActiveTheme = 'glitch' -- 'glitch' (purple), 'cyan' (original), 'monochrome' (black & white)
+config.ActiveTheme = 'orange' -- 'cyan' (original), 'monochrome' (black & white)
 
--- Active Visual Theme (the minigame panels)
-config.ActiveVisualTheme = 'device' -- 'device' (rugged handheld + LCD), 'tablet' (criminal tablet look), 'modern', 'classic'
-
--- Active Keybinds Theme (the keycap HUD on the left, drawn by glitch-uiElements)
-config.ActiveKeybindTheme = 'tags' -- 'tags' (key + label tags), 'default' (light keycaps), 'device' (rubber buttons), 'tablet' (graphite keys)
-
--- Active Sound Theme (the click / success / failure / penalty / button sounds of the NUI games)
---   'gta'     native GTA frontend sounds (default)
---   'classic' the original mp3s in ui/sounds
--- One game can override it with a trailing { sounds = 'classic' } table.
--- The Lua games (circuit breaker, brute force, data crack, drilling) always use their own GTA sounds.
-config.ActiveSoundTheme = 'gta'
-
--- Lockpick look: 'dial' (original tick dial), 'arc' (floating hairline ring), 'dots' (floating
--- dot ring), 'realistic' (brass cylinder + steel pick), 'padlock' (brass padlock + shackle).
--- Per call: 6th arg of StartLockpickGame.
-config.LockpickStyle = 'padlock'
-
--- Native sounds per theme: [sound] = { name, soundSet } for PlaySoundFrontend.
--- 'classic' is not listed here: it plays the mp3s in the NUI.
-config.SoundThemes = {
-    gta = {
-        click       = { 'NAV_UP_DOWN', 'HUD_FRONTEND_DEFAULT_SOUNDSET' },  -- selecting / small ticks
-        buttonPress = { 'SELECT', 'HUD_FRONTEND_DEFAULT_SOUNDSET' },       -- correct input
-        penalty     = { 'ERROR', 'HUD_FRONTEND_DEFAULT_SOUNDSET' },        -- wrong input / mistake
-        success     = { 'HACKING_SUCCESS', '' },                           -- game won
-        failure     = { 'HACKING_FAILURE', '' },                           -- game lost
-    },
-}
-
--- Where the controls HUD comes from:
---   'auto'       glitch-uiElements when it is running, otherwise ox_lib text UI
---   'uiElements' glitch-uiElements (falls back to ox_lib if it is not running)
---   'standalone' ox_lib text UI only - glitch-uiElements is not needed at all
--- With neither running, the old built-in HUD in this resource's NUI is used.
-config.KeybindDisplay = 'auto'
-config.KeybindPosition = nil             -- glitch-uiElements position ('left', 'right', 'bottom', ...); nil = its default
-                                         -- (the side HUD default, which /uidemo Save can change)
-config.CircleClickPosition = 'bottom' -- circle click (and ox_lib skillCheck): 'bottom', 'center', 'top', 'left', 'right',
-                                      -- 'top-left', 'top-right', 'bottom-left', 'bottom-right' or { x = 0.5, y = 0.8 };
-                                      -- one game can override it with a trailing { position = ... } table
-config.OxTextUIPosition = 'left-center'  -- ox_lib text UI position ('left-center', 'right-center', 'top-center')
+-- Active Visual Theme
+config.ActiveVisualTheme = 'modern' -- 'classic' (original), 'modern' (new sleek design)
 
 -- Background Transparency (0.0 = fully transparent, 1.0 = fully opaque)
 config.BackgroundOpacity = {
     classic = 0.80,  -- Default for classic theme
-    modern = 0.90,   -- Default for modern theme
-    tablet = 0.98,
-    device = 0.98,
+    modern = 0.90    -- Default for modern theme
 }
 
 -- Available Color Themes
@@ -312,56 +136,6 @@ config.Themes = {
         minigameColor3 = '#28e757ff',  -- VarHack block 3, Memory Colors green
         minigameColor4 = '#edeb64ff',  -- VarHack block 4, Memory Colors yellow
         minigameColor5 = '#eb87deff',  -- VarHack block 5
-    },
-
-    -- Glitch Purple Theme (the magenta / violet of the Glitch Studios logo)
-    glitch = {
-        -- Primary Theme Colors
-        primary = '#c04cff',          -- Brand magenta-purple - highlights, accents, borders
-        primaryRgba = '192, 76, 255',
-        secondary = '#7a2bd6',        -- Deeper violet for gradients
-        secondaryRgba = '122, 43, 214',
-
-        -- Success/Failure Colors
-        success = '#36f1a0',          -- Success feedback (mint, so it reads apart from the purple)
-        successRgba = '54, 241, 160',
-        failure = '#ff4d6d',          -- Failure/error (pink-red, sits well next to purple)
-        failureRgba = '255, 77, 109',
-
-        -- Warning/Caution Colors
-        warning = '#ff9f43',          -- Warning (orange)
-        warningRgba = '255, 159, 67',
-
-        -- Neutral/UI Colors
-        background = '#120a1c',       -- Near-black purple
-        backgroundRgba = '18, 10, 28',
-        backgroundGradient1 = '#120a1c', -- Gradient start
-        backgroundGradient1Rgba = '18, 10, 28',
-        backgroundGradient2 = '#2a1240', -- Gradient end (dark violet)
-        backgroundGradient2Rgba = '42, 18, 64',
-        backgroundSecondary = '#0c0614', -- Buttons / inset panels
-        backgroundSecondaryRgba = '12, 6, 20',
-        backgroundTertiary = '#1c0d2c',
-        backgroundTertiaryRgba = '28, 13, 44',
-        border = '#c04cff',
-        borderRgba = '192, 76, 255',
-        text = '#ffffff',
-        textRgba = '255, 255, 255',
-        textSecondary = '#a59bb3',    -- Lavender grey
-        textSecondaryRgba = '165, 155, 179',
-
-        -- Additional Colors
-        danger = '#ff3b5c',
-        dangerRgba = '255, 59, 92',
-        safe = '#36f1a0',
-        safeRgba = '54, 241, 160',
-
-        -- Minigame Specific Colors
-        minigameColor1 = '#6f5bffff',  -- VarHack block 1, Memory Colors blue
-        minigameColor2 = '#ff4d6dff',  -- VarHack block 2, Memory Colors red
-        minigameColor3 = '#36f1a0ff',  -- VarHack block 3, Memory Colors green
-        minigameColor4 = '#ffd166ff',  -- VarHack block 4, Memory Colors yellow
-        minigameColor5 = '#e86bffff',  -- VarHack block 5
     }
 }
 

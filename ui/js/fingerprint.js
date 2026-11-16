@@ -1,5 +1,5 @@
 // -- Glitch Minigames
-// -- Copyright (C) 2024-2026 Glitch Studios
+// -- Copyright (C) 2024 Glitch
 // -- 
 // -- This program is free software: you can redistribute it and/or modify
 // -- it under the terms of the GNU General Public License as published by
@@ -107,12 +107,6 @@ var Fingerprint = (function() {
 
     function start(config) {
         if (active) return;
-
-        // colours are set per game (config / per-call style), not just once at load
-        ARC_COLOR = window.MinigameColors.primary;
-        ARC_GLOW = `rgba(${window.MinigameColors.primaryRgba}, 0.5)`;
-        ARC_CORRECT_COLOR = window.MinigameColors.success;
-        ARC_CORRECT_GLOW = `rgba(${window.MinigameColors.successRgba}, 0.6)`;
         
         config = config || {};
         timeLimit = config.timeLimit || 30000;
@@ -337,7 +331,7 @@ var Fingerprint = (function() {
         playSound(success ? 'sound-success' : 'sound-failure');
         
         setTimeout(function() {
-            $.post('https://' + GetParentResourceName() + '/fingerprintResult', JSON.stringify({ success: success }));
+            $.post('https://glitch-minigames/fingerprintResult', JSON.stringify({ success: success }));
             close();
         }, 1500);
     }
@@ -356,12 +350,16 @@ var Fingerprint = (function() {
         $('#fingerprint-row-controls').empty();
         
         $('#fingerprint-container').removeClass('active').fadeOut(300, function() {
-            $.post('https://' + GetParentResourceName() + '/fingerprintClose', JSON.stringify({}));
+            $.post('https://glitch-minigames/fingerprintClose', JSON.stringify({}));
         });
     }
 
     function playSound(soundId) {
-        playSoundSafe(soundId); // app.js: follows the sound theme
+        var sound = document.getElementById(soundId);
+        if (sound) {
+            sound.currentTime = 0;
+            sound.play().catch(function() {});
+        }
     }
 
     window.fingerprintFunctions = {

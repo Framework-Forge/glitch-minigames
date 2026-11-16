@@ -1,5 +1,5 @@
 // -- Glitch Minigames
-// -- Copyright (C) 2024-2026 Glitch Studios
+// -- Copyright (C) 2024 Glitch
 // -- 
 // -- This program is free software: you can redistribute it and/or modify
 // -- it under the terms of the GNU General Public License as published by
@@ -308,7 +308,10 @@ function playMemorySound(type) {
                 audio = document.getElementById('sound-buttonPress');
         }
         
-        if (audio) playSoundSafe(audio.id); // app.js: follows the sound theme
+        if (audio) {
+            audio.currentTime = 0;
+            audio.play().catch(e => console.log('Audio play failed:', e));
+        }
     } catch (e) {
         console.log('Error playing sound:', e);
     }

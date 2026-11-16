@@ -1,6 +1,6 @@
 <!-- 
 -- Glitch Minigames
--- Copyright (C) 2024-2026 Glitch Studios
+-- Copyright (C) 2024 Glitch
 -- 
 -- This program is free software: you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
@@ -20,14 +20,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Glitch Minigames</title>
-    <!-- bundled fonts (ui/fonts, SIL OFL): tablet (Figtree, JetBrains Mono), device (Chakra Petch, VT323) and the rest -->
-    <link rel="stylesheet" href="fonts/fonts.css">
+    <title>Luma Minigames</title>
     <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="css/themes.css">
-    <link rel="stylesheet" href="css/hackGames.css"> <!-- shape recall, memory diff, traceroute, carrier tune -->
     <script>
-        // Debug print gate - routes console.log through a flag set from the Lua
+        // Debug print gate — routes console.log through a flag set from the Lua
         // config (config.DebugPrints). Off by default so the console stays quiet.
         // Early logs are buffered and flushed if debug is turned on. Warnings and
         // errors are never gated. Must run before any other script.
@@ -49,7 +45,7 @@
             };
         })();
     </script>
-    <script src="js/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         html, body {
@@ -64,8 +60,6 @@
     </style>
 </head>
 <body>
-    <!-- controls HUD: filled by app.js (controlsShow / controlsHide) -->
-    <div id="mg-controls" style="display:none"></div>
     <!-- Firewall Pulse Game Container -->
     <div id="hack-container" class="game-container">
         <div class="hack-title">
@@ -137,6 +131,11 @@
                 <div class="attempt-label">SEQ-03</div>
             </div>
         </div>
+        
+        <div class="sequence-help">
+            <div>PRESS KEYS SHOWN IN SEQUENCE</div>
+            <div class="key-hint">W, A, S, D, ←, →, ↑, ↓, 0-9</div>
+        </div>
     </div>
     
     <!-- Circuit Rhythm Game Container -->
@@ -172,6 +171,10 @@
                 <div class="rhythm-progress"></div>
             </div>
             <div class="timer-text">Progress: <span id="rhythm-progress">0</span>%</div>
+        </div>
+        
+        <div class="key-help">
+            <div id="rhythm-key-hint">Press keys to match falling notes</div>
         </div>
     </div>
     
@@ -239,7 +242,7 @@
         
         <div class="memory-display">
             <div class="memory-splash">
-                <div class="memory-icon">&#x1F9E0;</div>
+                <div class="memory-icon">🧠</div>
                 <span class="memory-text">PREPARING MEMORY MATRIX...</span>
             </div>
             <div class="memory-grid"></div>
@@ -264,7 +267,7 @@
         
         <div class="sequence-memory-display">
             <div class="sequence-memory-splash">
-                <div class="sequence-memory-icon">&#x1F504;</div>
+                <div class="sequence-memory-icon">🔄</div>
                 <span class="sequence-memory-text">PREPARING SEQUENCE MATRIX...</span>
             </div>
             <div class="sequence-memory-grid"></div>
@@ -289,7 +292,7 @@
         
         <div class="numbered-sequence-display">
             <div class="numbered-sequence-splash">
-                <div class="numbered-sequence-icon">&#x1F522;</div>
+                <div class="numbered-sequence-icon">🔢</div>
                 <span class="numbered-sequence-text">PREPARING NUMBERED MATRIX...</span>
             </div>
             <div class="numbered-sequence-grid"></div>
@@ -316,7 +319,7 @@
         
         <div class="verbal-memory-display">
             <div class="verbal-memory-splash">
-                <div class="verbal-memory-icon">&#x1F4DD;</div>
+                <div class="verbal-memory-icon">📝</div>
                 <span class="verbal-memory-text">PREPARING WORD MATRIX...</span>
             </div>            <div class="verbal-memory-game">
                 <div class="verbal-memory-top-section">
@@ -354,12 +357,12 @@
         
         <div class="symbol-search-display">
             <div class="symbol-search-splash">
-                <div class="symbol-search-icon">&#x1F50D;</div>
+                <div class="symbol-search-icon">🔍</div>
                 <span class="symbol-search-text">INITIALIZING SCANNER...</span>
             </div>
             <div class="symbol-search-target-display">
                 <span class="symbol-search-target-label">FIND TARGET:</span>
-                <span id="symbol-search-target">&#x25C6;</span>
+                <span id="symbol-search-target">◆</span>
             </div>
             <div class="symbol-search-grid"></div>
         </div>
@@ -373,6 +376,11 @@
                 <div class="symbol-search-timer-progress"></div>
             </div>
             <div class="timer-text">Time: <span id="symbol-search-timer">30.0</span>s</div>
+        </div>
+        
+        <div class="symbol-search-controls">
+            <span><span class="key">W A S D</span> / <span class="key">↑ ↓ ← →</span> Move</span>
+            <span><span class="key">ENTER</span> / <span class="key">SPACE</span> Select</span>
         </div>
     </div>
 
@@ -565,14 +573,16 @@
         <div class="balance-display">
             <canvas id="balance-gauge" width="320" height="200"></canvas>
             <div class="balance-controls">
+                <span class="balance-key">Q</span>
                 <div class="balance-danger-bar">
                     <div class="balance-danger-fill"></div>
                 </div>
+                <span class="balance-key">E</span>
             </div>
             <div class="balance-status safe">STABLE</div>
         </div>
         
-        <div class="balance-instruction">Keep the needle balanced - don't let it fall into the red zones!</div>
+        <div class="balance-instruction">Keep the needle balanced by pressing Q and E - don't let it fall into the red zones!</div>
         
         <div class="timer-container balance-timer-container">
             <div class="timer-bar">
@@ -595,14 +605,14 @@
     <div id="bar-hit-container">
         <div class="bar-hit-label">
             <span>PRESS <span class="bar-hit-key-badge" id="bar-hit-key">E</span></span>
-            <span class="bar-hit-stats">ROUND <span id="bar-hit-round">1</span>/<span id="bar-hit-rounds">3</span> &nbsp;|&nbsp; &#x2715;<span id="bar-hit-failures">0</span>/<span id="bar-hit-max-failures">3</span></span>
+            <span class="bar-hit-stats">ROUND <span id="bar-hit-round">1</span>/<span id="bar-hit-rounds">3</span> &nbsp;|&nbsp; ✕<span id="bar-hit-failures">0</span>/<span id="bar-hit-max-failures">3</span></span>
         </div>
         <div class="bar-hit-track">
             <div class="bar-hit-fill"></div>
             <div class="bar-hit-zone"></div>
         </div>
         <div class="bar-hit-bottom">
-            <span id="bar-hit-message" class="bar-hit-msg">&#x2014;</span>
+            <span id="bar-hit-message" class="bar-hit-msg">—</span>
             <div class="bar-hit-timer-bar"><div class="bar-hit-timer-progress"></div></div>
         </div>
     </div>
@@ -736,7 +746,7 @@
         </div>
         <div id="wc-board" class="wc-board"></div>
         <div class="wc-footer">
-            <span id="wc-status" class="wc-status">Drag each cable to its socket</span>
+            <span id="wc-status" class="wc-status">Select a left terminal to begin</span>
             <div class="wc-timer-row">
                 <div class="wc-timer-bar"><div id="wc-timer-fill" class="wc-timer-fill"></div></div>
                 <span id="wc-time-text" class="wc-time-text"></span>
@@ -751,7 +761,7 @@
         </div>
         <div class="ss-info-row">
             <span id="ss-round">Round 1 / 5</span>
-            <span id="ss-status" class="ss-status">Watch carefully&#x2026;</span>
+            <span id="ss-status" class="ss-status">Watch carefully…</span>
             <span id="ss-progress-text">0 / 1</span>
         </div>
         <div class="ss-grid">
@@ -792,126 +802,6 @@
         </div>
     </div>
 
-    <!-- ===== Hack games pack (css/hackGames.css, js/hackGamesKit.js) ===== -->
-    <!-- Shape Recall Container -->
-    <div id="shape-recall-container" class="game-container ng-shell">
-        <div class="hack-title">
-            <h2><span id="sr-title">SHAPE RECALL</span> <span class="blink" id="sr-tag">[CAPTCHA]</span></h2>
-        </div>
-        <div class="sr-display">
-            <div id="sr-grid"><div id="sr-board"></div></div>
-        </div>
-        <div class="hack-info">
-            <div class="ng-msg" id="sr-msg"></div>
-            <div class="sr-qrow" id="sr-question"></div>
-            <div class="sr-answer" id="sr-answer">
-                <input type="text" id="sr-input" class="mc-answer-input" autocomplete="off" spellcheck="false" placeholder="e.g. blue square">
-                <button id="sr-submit" class="mc-submit-btn">Submit</button>
-            </div>
-            <div class="sr-reveal" id="sr-reveal" style="display:none"></div>
-            <div class="sr-foot mc-stats">
-                <span>Round: <span id="sr-round">1 / 4</span></span>
-                <div class="sr-pips" id="sr-pips"></div>
-                <span>Strikes: <span id="sr-strikes">0 / 0</span></span>
-            </div>
-        </div>
-        <div class="timer-container mc-timer-container">
-            <div class="timer-bar"><div class="mc-timer-progress" id="sr-bar"></div></div>
-            <div class="timer-text">Time: <span id="sr-time">0.0</span>s</div>
-        </div>
-    </div>
-
-    <!-- Memory Diff Container -->
-    <div id="memory-diff-container" class="game-container ng-shell">
-        <div class="hack-title">
-            <h2><span id="md-title">MEMORY DIFF</span> <span class="blink" id="md-tag">[SCAN]</span></h2>
-        </div>
-        <div class="md-boards">
-            <div class="md-side"><span class="ng-label">Image A</span><div class="md-grid" id="md-gridA"></div></div>
-            <div class="md-side"><span class="ng-label">Image B</span><div class="md-grid" id="md-gridB"></div></div>
-        </div>
-        <div class="md-mem" id="md-mem"><i></i></div>
-        <div class="hack-info">
-            <div class="ng-msg" id="md-msg"></div>
-            <div class="ng-stats mc-stats">
-                <span>Found: <b id="md-found">0 / 0</b></span>
-                <div class="ng-pips" id="md-pips"></div>
-                <span id="md-peeks-wrap">Peeks: <b id="md-peeks">0</b></span>
-                <span>Strikes: <b id="md-strikes">0 / 0</b></span>
-            </div>
-        </div>
-        <div class="timer-container mc-timer-container">
-            <div class="timer-bar"><div class="mc-timer-progress" id="md-bar"></div></div>
-            <div class="timer-text">Time: <span id="md-time">0.0</span>s</div>
-        </div>
-    </div>
-
-    <!-- Traceroute Container -->
-    <div id="traceroute-container" class="game-container ng-shell">
-        <div class="hack-title">
-            <h2><span id="tr-title">TRACEROUTE</span> <span class="blink" id="tr-tag">[ROUTING]</span></h2>
-        </div>
-        <div class="tr-body">
-            <div class="tr-board" id="tr-board"></div>
-            <div class="tr-side">
-                <span class="ng-label">Hops</span>
-                <div class="tr-big" id="tr-hops-big">0 / 0</div>
-                <div class="tr-hops" id="tr-hop-grid"></div>
-                <span class="ng-label">TTL</span>
-                <div class="tr-ttl"><i id="tr-ttl"></i></div>
-                <span class="ng-label">Route</span>
-                <div class="tr-route-txt" id="tr-route"></div>
-            </div>
-        </div>
-        <div class="hack-info">
-            <div class="ng-msg" id="tr-msg"></div>
-            <div class="ng-stats mc-stats">
-                <span>Trace: <b id="tr-round">1 / 1</b></span>
-                <div class="ng-pips" id="tr-pips"></div>
-                <span>Strikes: <b id="tr-strikes">0 / 0</b></span>
-            </div>
-        </div>
-        <div class="timer-container mc-timer-container">
-            <div class="timer-bar"><div class="mc-timer-progress" id="tr-bar"></div></div>
-            <div class="timer-text">TTL: <span id="tr-time">0.0</span>s</div>
-        </div>
-    </div>
-
-    <!-- Carrier Tune Container -->
-    <div id="carrier-tune-container" class="game-container ng-shell">
-        <div class="hack-title">
-            <h2><span id="ct-title">CARRIER TUNE</span> <span class="blink" id="ct-tag">[TUNE]</span></h2>
-        </div>
-        <div class="ct-top">
-            <div class="ng-pips" id="ct-pips"></div>
-            <div class="ct-status"><div class="ct-sig" id="ct-sig"></div><span class="ng-label" id="ct-stat">Tune</span></div>
-        </div>
-        <div class="ct-scope" id="ct-scope"></div>
-        <div class="ct-hold"><i id="ct-hold"></i></div>
-        <div class="ct-ctrls">
-            <div class="ct-knob">
-                <div class="ct-knob-head"><span class="ng-label">Frequency</span><span class="ct-val" id="ct-fval">0.0</span></div>
-                <div class="ct-btns"><div class="ct-btn" data-k="f" data-d="-1">-</div><div class="ct-btn" data-k="f" data-d="1">+</div></div>
-            </div>
-            <div class="ct-knob">
-                <div class="ct-knob-head"><span class="ng-label">Amplitude</span><span class="ct-val" id="ct-aval">0.00</span></div>
-                <div class="ct-btns"><div class="ct-btn" data-k="a" data-d="-1">-</div><div class="ct-btn" data-k="a" data-d="1">+</div></div>
-            </div>
-        </div>
-        <div class="hack-info">
-            <div class="ng-msg" id="ct-msg"></div>
-            <div class="ng-stats mc-stats">
-                <span>Locks: <b id="ct-locks">0 / 0</b></span>
-                <span>Freq off: <b id="ct-foff">0.00</b></span>
-                <span>Amp off: <b id="ct-aoff">0.00</b></span>
-            </div>
-        </div>
-        <div class="timer-container mc-timer-container">
-            <div class="timer-bar"><div class="mc-timer-progress" id="ct-bar"></div></div>
-            <div class="timer-text">TTL: <span id="ct-time">0.0</span>s</div>
-        </div>
-    </div>
-
     <script src="js/numberedSequence.js"></script>
     <script src="js/balance.js"></script>
     <script src="js/firewallPulse.js"></script>
@@ -919,7 +809,7 @@
     <script src="js/app.js"></script>
     <script src="js/rhythm.js"></script>
     <script src="js/keymash.js"></script>
-    <script src="js/varHack.js"></script>
+    <script src="js/varhack.js"></script>
     <script src="js/memory.js"></script>
     <script src="js/sequenceMemory.js"></script>
     <script src="js/verbalMemory.js"></script>
@@ -942,10 +832,5 @@
     <script src="js/holdZone.js"></script>
     <script src="js/wireConnect.js"></script>
     <script src="js/simonSays.js"></script>
-    <script src="js/hackGamesKit.js"></script>
-    <script src="js/shapeRecall.js"></script>
-    <script src="js/memoryDiff.js"></script>
-    <script src="js/traceroute.js"></script>
-    <script src="js/carrierTune.js"></script>
 </body>
 </html>

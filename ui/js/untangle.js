@@ -1,5 +1,5 @@
 // -- Glitch Minigames
-// -- Copyright (C) 2024-2026 Glitch Studios
+// -- Copyright (C) 2024 Glitch
 // -- 
 // -- This program is free software: you can redistribute it and/or modify
 // -- it under the terms of the GNU General Public License as published by
@@ -68,7 +68,7 @@ var Untangle = (function() {
     }
 
     function generateEdges() {
-        // Fan triangulation - always a planar graph, so the puzzle is always solvable.
+        // Fan triangulation — always a planar graph, so the puzzle is always solvable.
         // Outer cycle: 0-1-2-..-(n-1)-0, plus diagonals from node 0 to nodes 2..n-2.
         edges = [];
         for (var i = 0; i < nodeCount - 1; i++) {
@@ -310,12 +310,6 @@ var Untangle = (function() {
 
     function startGame(config) {
         console.log('[Untangle] Starting', config);
-
-        // colours are set per game (config / per-call style), not just once at load
-        NODE_COLOR = window.MinigameColors.primary;
-        NODE_GLOW = `rgba(${window.MinigameColors.primaryRgba}, 0.6)`;
-        LINE_COLOR = window.MinigameColors.primary;
-        LINE_INTERSECT_COLOR = window.MinigameColors.failure;
         
         nodeCount = (config && config.nodeCount) ? config.nodeCount : 8;
         timeLimit = (config && config.timeLimit) ? config.timeLimit : 60000;

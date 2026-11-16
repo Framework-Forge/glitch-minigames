@@ -1,5 +1,5 @@
 -- Glitch Minigames
--- Copyright (C) 2024-2026 Glitch Studios
+-- Copyright (C) 2024 Glitch
 -- 
 -- This program is free software: you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
@@ -15,27 +15,15 @@
 -- along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 PlasmaDrilling = {}
-local setupDrillingCamera, beginnDrilling, stopDrilling -- local, defined below
-local extra = 'SET_SPEED' -- scaleform method for the drill speed (laser width on VAULT_LASER)
-
--- Result popups through glitch-notifications (config.usingGlitchNotifications, optional)
-local function notify(title, text, colour)
-    if config.usingGlitchNotifications and GetResourceState('glitch-notifications') == 'started' then
-        exports['glitch-notifications']:ShowNotification(title, text, 3000, colour, false)
-    end
-end
 
 PlasmaDrilling.DisabledControls = {30,31,32,33,34,35}
 PlasmaDrilling.CameraHandle = nil
+PlasmaDrilling.ControlsNotificationId = nil
 
 PlasmaDrilling.Start = function(callback)
     if not PlasmaDrilling.Active then
         PlasmaDrilling.Active = true
-        PlasmaDrilling.Result = false
-        if not PlasmaDrilling.Init() then
-            -- scaleform did not load: fail instead of drawing nothing
-            PlasmaDrilling.Active = false
-        end
+        PlasmaDrilling.Init()
         PlasmaDrilling.Update(callback)
     end
 end
@@ -46,10 +34,6 @@ PlasmaDrilling.Init = function()
   end
 
   PlasmaDrilling.Scaleform = Scaleforms.LoadMovie(PlasmaDrilling.Type)
-  if not PlasmaDrilling.Scaleform then
-    print(('^3[glitch-minigames] %s scaleform did not load^7'):format(tostring(PlasmaDrilling.Type)))
-    return false
-  end
   if PlasmaDrilling.Type == 'VAULT_LASER' then
     extra = "SET_LASER_WIDTH"
   else
@@ -68,7 +52,6 @@ PlasmaDrilling.Init = function()
   Scaleforms.PopFloat(PlasmaDrilling.Scaleform,"SET_TEMPERATURE",     0.0)
   Scaleforms.PopFloat(PlasmaDrilling.Scaleform,"SET_HOLE_DEPTH",      0.0)
   Scaleforms.PopInt(PlasmaDrilling.Scaleform,"SET_NUM_DISCS",      6)
-  return true
 end
 
 PlasmaDrilling.Update = function(callback)
@@ -77,7 +60,7 @@ PlasmaDrilling.Update = function(callback)
     PlasmaDrilling.DisableControls()
     
     if IsEntityDead(PlayerPedId()) then
-      Minigames.Debug('plasma drilling cancelled: player died')
+      print("Plasma drilling cancelled - player died")
       PlasmaDrilling.Result = false
       PlasmaDrilling.Active = false
       
@@ -86,21 +69,8 @@ PlasmaDrilling.Update = function(callback)
       break
     end
     
-    -- a script error in here would kill the loop and leave the camera, prop and
-    -- shake on until the watchdog: end the game as a fail instead
-    local ok, err = pcall(PlasmaDrilling.HandleControls)
-    if not ok then
-      print('^1[glitch-minigames] plasma drilling error: ' .. tostring(err) .. '^7')
-      PlasmaDrilling.Result = false
-      PlasmaDrilling.Active = false
-      break
-    end
+    PlasmaDrilling.HandleControls()
     Wait(0)
-  end
-  -- release the VAULT_LASER movie as soon as the run is over
-  if PlasmaDrilling.Scaleform then
-    Scaleforms.UnloadMovie(PlasmaDrilling.Scaleform)
-    PlasmaDrilling.Scaleform = nil
   end
   callback(PlasmaDrilling.Result)
 end
@@ -110,9 +80,7 @@ PlasmaDrilling.Draw = function()
 end
 
 PlasmaDrilling.HandleControls = function()
-  -- ESC: disabled so the pause menu stays shut, read as the disabled control
-  DisableControlAction(0, 200, true)
-  if IsDisabledControlJustPressed(0, 200) or IsControlJustPressed(0, 177) then -- ESC key
+  if IsControlJustPressed(0, 200) or IsControlJustPressed(0, 177) then -- ESC key
     PlasmaDrilling.Result = false
     PlasmaDrilling.Active = false
     Scaleforms.PopVoid(PlasmaDrilling.Scaleform, "RESET")
@@ -120,10 +88,8 @@ PlasmaDrilling.HandleControls = function()
   end
   
   local last_pos = PlasmaDrilling.DrillPos
-  -- A tap only nudges through the hole already cut; new depth needs UP held
-  -- (which builds heat), so spamming UP can't finish the drill cold.
-  if IsControlJustPressed(0,188) and PlasmaDrilling.DrillPos < PlasmaDrilling.HoleDepth then -- (UP)
-    PlasmaDrilling.DrillPos = math.min(PlasmaDrilling.HoleDepth,PlasmaDrilling.DrillPos + 0.01)
+  if IsControlJustPressed(0,188) then -- (UP)
+    PlasmaDrilling.DrillPos = math.min(1.0,PlasmaDrilling.DrillPos + 0.01)
     Scaleforms.PopVoid(PlasmaDrilling.Scaleform,"burstOutSparks")
   elseif IsControlPressed(0,188) then -- (UP)
     PlasmaDrilling.DrillPos = math.min(1.0,PlasmaDrilling.DrillPos + (0.1 * GetFrameTime() / (math.max(0.1,PlasmaDrilling.DrillTemp) * 10)))
@@ -194,37 +160,19 @@ PlasmaDrilling.HandleControls = function()
   PlasmaDrilling.HoleDepth = (PlasmaDrilling.DrillPos > PlasmaDrilling.HoleDepth and PlasmaDrilling.DrillPos or PlasmaDrilling.HoleDepth)
 end
 
--- Resource stop mid-drill: stop the sound, delete the drill and give control back
-PlasmaDrilling.StopNow = function()
-  if not PlasmaDrilling.Active then return end
-  PlasmaDrilling.Active = false
-  PlasmaDrilling.Result = false
-  if PlasmaDrilling.SoundId then
-    StopSound(PlasmaDrilling.SoundId)
-    ReleaseSoundId(PlasmaDrilling.SoundId)
-    PlasmaDrilling.SoundId = nil
-  end
-  if PlasmaDrilling.Prop and DoesEntityExist(PlasmaDrilling.Prop) then
-    DeleteEntity(PlasmaDrilling.Prop)
-  end
-  PlasmaDrilling.Prop = nil
-  if PlasmaDrilling.CameraHandle then
-    DestroyCam(PlasmaDrilling.CameraHandle, false)
-    RenderScriptCams(false, false, 0, true, true)
-    PlasmaDrilling.CameraHandle = nil
-  end
-  StopGameplayCamShaking(true)
-  FreezeEntityPosition(PlayerPedId(), false)
-  ClearPedTasks(PlayerPedId())
-end
-
 PlasmaDrilling.DisableControls = function()
   for _,control in ipairs(PlasmaDrilling.DisabledControls) do
     DisableControlAction(0,control,true)
   end
 end
 
-setupDrillingCamera = function()
+PlasmaDrilling.EnableControls = function()
+  for _,control in ipairs(PlasmaDrilling.DisabledControls) do
+    DisableControlAction(0,control,true)
+  end
+end
+
+function setupDrillingCamera()
     if PlasmaDrilling.CameraHandle then
         DestroyCam(PlasmaDrilling.CameraHandle, false)
         RenderScriptCams(false, false, 0, true, true)
@@ -242,12 +190,15 @@ setupDrillingCamera = function()
     RenderScriptCams(true, true, 500, true, true)
 end
 
-beginnDrilling = function(callback)
+function beginnDrilling(callback)
   local ped = PlayerPedId()
   local animDict = "anim@heists@fleeca_bank@drilling"
   local animLib = "drill_straight_idle"
 
-  Minigames.LoadAnimDict(animDict)
+  RequestAnimDict(animDict)
+  while not HasAnimDictLoaded(animDict) do
+      Wait(50)
+  end
   
   SetCurrentPedWeapon(ped, GetHashKey("WEAPON_UNARMED"), true)
   Wait(500)
@@ -255,51 +206,51 @@ beginnDrilling = function(callback)
   local drillProp = GetHashKey('hei_prop_heist_drill')
   local boneIndex = GetPedBoneIndex(ped, 28422)
 
-  TaskPlayAnim(ped, animDict, animLib, 1.0, -1.0, -1, 2, 0, 0, 0, 0)
-  local attachedDrill = nil
-  if Minigames.LoadModel(drillProp) then
-    attachedDrill = CreateObject(drillProp, 1.0, 1.0, 1.0, true, true, false)
-    SetModelAsNoLongerNeeded(drillProp)
-    AttachEntityToEntity(attachedDrill, ped, boneIndex, 0.0, 0, 0.0, 0.0, 0.0, 0.0, true, true, false, false, 2, true)
-    SetEntityAsMissionEntity(attachedDrill, true, true)
+  RequestModel(drillProp)
+  while not HasModelLoaded(drillProp) do
+      Wait(100)
   end
-  PlasmaDrilling.Prop = attachedDrill
+
+  TaskPlayAnim(ped, animDict, animLib, 1.0, -1.0, -1, 2, 0, 0, 0, 0)
+  local attachedDrill = CreateObject(drillProp, 1.0, 1.0, 1.0, true, true, false)
+  AttachEntityToEntity(attachedDrill, ped, boneIndex, 0.0, 0, 0.0, 0.0, 0.0, 0.0, true, true, false, false, 2, true)
+  SetEntityAsMissionEntity(attachedDrill, true, true)
 
   setupDrillingCamera()
 
-  -- controls are shown by the controls HUD (client/core/controls.lua)
+  if config.usingGlitchNotifications then
+    PlasmaDrilling.ControlsNotificationId = exports['glitch-notifications']:ShowNotification(
+        'Plasma Drilling Controls',
+        'Up/Down Arrow - Move Drill\n‎ ‎ ‎ ‎ ‎ Left/Right Arrow - Speed Up\nESC - Cancel',
+        0,
+        '#ff9f1c',
+        false
+    )
+  end
 
-  Drilling.LoadSound() -- defined in fleecaDrilling.lua
+  loadDrillSound()
   Wait(100)
   local soundId = GetSoundId()
-  PlasmaDrilling.SoundId = soundId
-  if attachedDrill then
-    PlaySoundFromEntity(soundId, "Drill", attachedDrill, "DLC_HEIST_FLEECA_SOUNDSET", 1, 0)
-  end
+  PlaySoundFromEntity(soundId, "Drill", attachedDrill, "DLC_HEIST_FLEECA_SOUNDSET", 1, 0)
 
   ShakeGameplayCam("SKY_DIVING_SHAKE", 0.6)
 
   PlasmaDrilling.Type = 'VAULT_LASER'
   PlasmaDrilling.Start(function(status)
-      if attachedDrill and DoesEntityExist(attachedDrill) then
-        DeleteObject(attachedDrill)
-        DeleteEntity(attachedDrill)
-      end
-      PlasmaDrilling.Prop = nil
+      DeleteObject(attachedDrill)
+      DeleteEntity(attachedDrill)
       ClearPedTasksImmediately(ped)
-      -- StopNow (watchdog / resource stop) already released the sound and cleared
-      -- SoundId; releasing it again could free an id another script holds by now
-      if PlasmaDrilling.SoundId == soundId then
-        StopSound(soundId)
-        ReleaseSoundId(soundId)
-      end
-      PlasmaDrilling.SoundId = nil
+      StopSound(soundId)
       StopGameplayCamShaking(true)
 
       if PlasmaDrilling.CameraHandle then
           DestroyCam(PlasmaDrilling.CameraHandle, false)
           RenderScriptCams(false, false, 500, true, true)
           PlasmaDrilling.CameraHandle = nil
+      end
+
+      if PlasmaDrilling.ControlsNotificationId then
+          exports['glitch-notifications']:RemoveNotification(PlasmaDrilling.ControlsNotificationId)
       end
 
       stopDrilling(status)
@@ -309,17 +260,34 @@ beginnDrilling = function(callback)
   end)
 end
 
-stopDrilling = function(success)
+function robTimer()
+	robTime = Config.RobberyTime * 60
+
+	Citizen.CreateThread(function()
+		repeat
+			Citizen.Wait(1000)
+			robTime = robTime - 1
+		until robTime == 0
+	end)
+end
+
+function stopDrilling(success)
   local ped = PlayerPedId()
   FreezeEntityPosition(ped, false)
   ClearPedTasks(ped)
   ClearPedSecondaryTask(ped)
+  robTime = 0
+  RobbingATM = false    
 
   if success then
-      notify(Minigames.T('Success'), Minigames.T('Plasma drilling complete!'), '#00ff00')
+      if config.usingGlitchNotifications then
+        exports['glitch-notifications']:ShowNotification('Success', 'Plasma drilling complete!', 3000, '#00ff00', false)
+      end
       TriggerEvent("glitch-minigames:plasmaDrillComplete", true)
   else
-      notify(Minigames.T('Failed'), Minigames.T('Plasma drilling failed!'), '#ff0000')
+      if config.usingGlitchNotifications then
+        exports['glitch-notifications']:ShowNotification('Failed', 'Plasma drilling failed!', 3000, '#ff0000', false)
+      end
       TriggerEvent("glitch-minigames:plasmaDrillComplete", false)
   end
 end
@@ -338,7 +306,7 @@ exports('StartPlasmaDrilling', function(difficultyOrCallback, optionalCallback)
     local difficulty = 5
     local userCallback
     
-    if Minigames.IsCallable(difficultyOrCallback) then
+    if type(difficultyOrCallback) == 'function' then
         userCallback = difficultyOrCallback
     elseif type(difficultyOrCallback) == 'number' then
         difficulty = difficultyOrCallback
@@ -366,12 +334,9 @@ exports('StartPlasmaDrilling', function(difficultyOrCallback, optionalCallback)
     end
 end)
 
--- Lock watchdog (client/core/client.lua): end a stuck drill as a fail
-Minigames.OnRelease(PlasmaDrilling.StopNow)
-
 if config.DebugCommands then 
   RegisterCommand('testplasma', function()
-      local success = exports[GetCurrentResourceName()]:StartPlasmaDrilling(5)
+      local success = exports['glitch-minigames']:StartPlasmaDrilling(5)
       if success then
           print("Drilling successful!")
       else

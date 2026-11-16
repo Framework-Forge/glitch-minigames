@@ -1,5 +1,5 @@
 // -- Glitch Minigames
-// -- Copyright (C) 2024-2026 Glitch Studios
+// -- Copyright (C) 2024 Glitch
 // -- 
 // -- This program is free software: you can redistribute it and/or modify
 // -- it under the terms of the GNU General Public License as published by
@@ -31,7 +31,6 @@
     let timeLimit = 10; // in seconds
     let timeRemaining = 0;
     let timerInterval;
-    let hideTimeout = null; // delayed fade-out after a game ends; cancelled by the next start
     let hackConfig = {
         requiredHacks: 3,
         initialSpeed: 2,
@@ -43,10 +42,6 @@
     };
 
     function startGame() {
-        // a game started within 1.5s of the last one ending used to be hidden by
-        // the previous game's delayed fade-out
-        clearTimeout(hideTimeout);
-        hideTimeout = null;
         isActive = true;
         canClick = true;
         successCount = 0;
@@ -83,9 +78,7 @@
         }
         $('.pulse-bar').removeClass('success-bar fail-bar');
         
-        clearTimeout(hideTimeout);
-        hideTimeout = setTimeout(() => {
-            hideTimeout = null;
+        setTimeout(() => {
             $('#hack-container').fadeOut(500, function() {
                 isActive = false;
                 canClick = true;
@@ -197,7 +190,7 @@
             $('#message').text('FIREWALL BYPASSED!');
             playSoundSafe('sound-success');
             
-            fetch('https://' + GetParentResourceName() + '/hackSuccess', {
+            fetch('https://glitch-minigames/hackSuccess', {
                 method: 'POST',
                 body: JSON.stringify({})
             });
@@ -224,7 +217,7 @@
         $('#message').text(reason || 'BREACH FAILED! Security alerted.');
         playSoundSafe('sound-failure');
         
-        fetch('https://' + GetParentResourceName() + '/hackFail', {
+        fetch('https://glitch-minigames/hackFail', {
             method: 'POST',
             body: JSON.stringify({})
         });

@@ -1,5 +1,5 @@
 // -- Glitch Minigames
-// -- Copyright (C) 2024-2026 Glitch Studios
+// -- Copyright (C) 2024 Glitch
 // -- 
 // -- This program is free software: you can redistribute it and/or modify
 // -- it under the terms of the GNU General Public License as published by
@@ -36,56 +36,29 @@
         81: 'Q', 69: 'E', 82: 'R', 70: 'F',
         71: 'G', 72: 'H', 74: 'J', 75: 'K',
         76: 'L', 90: 'Z', 88: 'X', 67: 'C',
-        86: 'V', 66: 'B', 78: 'N', 77: 'M',
-        73: 'I', 79: 'O', 80: 'P', 84: 'T',
-        85: 'U', 89: 'Y'
+        86: 'V', 66: 'B', 78: 'N', 77: 'M'
     };
 
-    const DEFAULT_POOL = ['W', 'A', 'S', 'D', 'Q', 'E'];
-    const DEFAULT_MESSAGE = 'Input the sequence to break the encryption';
-    let attemptsLeft = 1;
-
-    // Accepts both the Lua export names (requiredSequences, sequenceLength,
-    // possibleKeys, maxAttempts, timePenalty, keyHintText) and the old ones.
     function startSequenceGame(config) {
-        config = config || {};
-        const known = Object.values(keyCodeMap);
-        const rawPool = Array.isArray(config.keyPool) ? config.keyPool : (Array.isArray(config.possibleKeys) ? config.possibleKeys : []);
-        const pool = rawPool.map((k) => String(k).toUpperCase()).filter((k) => known.includes(k));
-        sequenceConfig = {
-            totalStages: Math.max(1, Math.floor(config.totalStages || config.requiredSequences || 3)),
-            keysPerStage: Math.max(1, Math.floor(config.keysPerStage || config.sequenceLength || 4)),
-            timeLimit: config.timeLimit || 10,
-            keyPool: pool.length ? pool : DEFAULT_POOL,
-            maxAttempts: Math.max(1, Math.floor(config.maxAttempts || 1)),
-            timePenalty: Math.max(0, Number(config.timePenalty) || 0),
-            message: config.keyHintText ? String(config.keyHintText) : DEFAULT_MESSAGE
-        };
-        attemptsLeft = sequenceConfig.maxAttempts;
-
+        if (config) {
+            sequenceConfig = {
+                totalStages: config.totalStages || 3,
+                keysPerStage: config.keysPerStage || 4,
+                timeLimit: config.timeLimit || 10,
+                keyPool: config.keyPool || ['W', 'A', 'S', 'D', 'Q', 'E']
+            };
+        }
+        
         sequenceActive = true;
         currentStage = 0;
         pressedKeys = [];
-
-        buildStageIndicators();
-        $('#seq-message').text(sequenceConfig.message);
-        $('#time-penalty').text('');
-
+        
+        $('.attempt-indicator').removeClass('active success failure');
+        $('.sequence-attempt[data-attempt="1"] .attempt-indicator').addClass('active');
+        
         $('#sequence-container').fadeIn();
-
+        
         generateNewSequence();
-    }
-
-    // One indicator per sequence (the page ships with three)
-    function buildStageIndicators() {
-        const box = $('.sequence-progress').empty();
-        for (let i = 1; i <= sequenceConfig.totalStages; i++) {
-            box.append(
-                $('<div>').addClass('sequence-attempt').attr('data-attempt', i)
-                    .append($('<div>').addClass('attempt-indicator' + (i === 1 ? ' active' : '')))
-                    .append($('<div>').addClass('attempt-label').text('SEQ-' + String(i).padStart(2, '0')))
-            );
-        }
     }
 
     function generateNewSequence() {
@@ -176,25 +149,13 @@
                 } else {
                     $('#seq-message').text('Stage Complete! Next sequence starting...');
                     setTimeout(() => {
-                        if (!sequenceActive) return;
-                        $('#seq-message').text(sequenceConfig.message);
+                        $('#seq-message').text('Input the sequence to break the encryption');
                         generateNewSequence();
                     }, 1000);
                 }
             }
         } else {
-            attemptsLeft--;
-            if (attemptsLeft <= 0) return onSequenceFailure('Wrong key! Sequence failed.');
-            // retry the same sequence from its first key, minus the time penalty
-            playSoundSafe('sound-failure');
-            pressedKeys = [];
-            if (sequenceConfig.timePenalty > 0) {
-                sequenceTimeLimit = Math.max(0, sequenceTimeLimit - sequenceConfig.timePenalty);
-                $('#time-penalty').text('-' + sequenceConfig.timePenalty + 's');
-                setTimeout(() => $('#time-penalty').text(''), 800);
-            }
-            $('#seq-message').text('Wrong key! ' + attemptsLeft + (attemptsLeft === 1 ? ' attempt' : ' attempts') + ' left');
-            updateSequenceDisplay();
+            onSequenceFailure('Wrong key! Sequence failed.');
         }
     }
 
@@ -238,7 +199,7 @@
         
         updateSequenceProgress();
         
-        fetch('https://' + GetParentResourceName() + '/sequenceResult', {
+        fetch('https://glitch-minigames/sequenceResult', {
             method: 'POST',
             body: JSON.stringify({ success: true })
         });
@@ -256,7 +217,7 @@
         
         $('.sequence-attempt[data-attempt="' + (currentStage + 1) + '"] .attempt-indicator').addClass('failure');
         
-        fetch('https://' + GetParentResourceName() + '/sequenceResult', {
+        fetch('https://glitch-minigames/sequenceResult', {
             method: 'POST',
             body: JSON.stringify({ success: false })
         });

@@ -1,18 +1,18 @@
-// -- Glitch Minigames - Combo Input
-// -- Minimal HUD: directional combo (W/A/S/D shown as ^<-v->) type it fast
+// -- Glitch Minigames — Combo Input
+// -- Minimal HUD: directional combo (W/A/S/D shown as ↑←↓→) type it fast
 
 window.comboInputGame = (function () {
 
-    // Direction key map: JS keyCode -> display symbol & axis label
+    // Direction key map: JS keyCode → display symbol & axis label
     const DIR_MAP = {
-        87: { sym: '\u2191', label: 'W' },
-        65: { sym: '\u2190', label: 'A' },
-        83: { sym: '\u2193', label: 'S' },
-        68: { sym: '\u2192', label: 'D' }
+        87: { sym: '↑', label: 'W' },
+        65: { sym: '←', label: 'A' },
+        83: { sym: '↓', label: 'S' },
+        68: { sym: '→', label: 'D' }
     };
     const DIR_KEYS = [87, 65, 83, 68];
 
-    // Arrow key aliases -> WASD equivalents
+    // Arrow key aliases → WASD equivalents
     const ARROW_MAP = { 38: 87, 37: 65, 40: 83, 39: 68 };
 
     let config   = {};
@@ -25,7 +25,7 @@ window.comboInputGame = (function () {
     let timerInt = null;
     let _gen     = 0;       // incremented on each start(); guards stale endGame callbacks
 
-    // -- helpers ---------------------------------------------
+    // ── helpers ─────────────────────────────────────────────
 
     function generateCombo(length) {
         const arr = [];
@@ -53,7 +53,7 @@ window.comboInputGame = (function () {
         if (timerInt) { clearInterval(timerInt); timerInt = null; }
     }
 
-    // -- round/game flow --------------------------------------
+    // ── round/game flow ──────────────────────────────────────
 
     function startRound() {
         round++;
@@ -104,7 +104,6 @@ window.comboInputGame = (function () {
     }
 
     function endGame(success) {
-        document.removeEventListener('keydown', onKeyDown);
         clearTimer();
         active        = false;
         window.comboInputGame.active = false;
@@ -117,12 +116,12 @@ window.comboInputGame = (function () {
             if (_gen !== thisGen) return;
             $c.fadeOut(300, function() {
                 if (_gen !== thisGen) return;
-                $.post('https://' + GetParentResourceName() + '/comboInputResult', JSON.stringify({ success: success }));
+                $.post('https://glitch-minigames/comboInputResult', JSON.stringify({ success: success }));
             });
         }, success ? 600 : 450);
     }
 
-    // -- key handler ------------------------------------------
+    // ── key handler ──────────────────────────────────────────
 
     function handleKey(keyCode) {
         if (!active) return;
@@ -144,7 +143,7 @@ window.comboInputGame = (function () {
                 }, 330);
             }
         } else {
-            // Wrong key - reset combo progress (not a full failure)
+            // Wrong key — reset combo progress (not a full failure)
             playSoundSafe('sound-penalty');
             cursor = 0;
             renderArrows();
@@ -154,18 +153,9 @@ window.comboInputGame = (function () {
         }
     }
 
-    // -- public API -------------------------------------------
+    // ── public API ───────────────────────────────────────────
 
     let _onKeyDown = null;
-
-    function onKeyDown(e) {
-        if (!active) return;
-        // Arrow keys map to WASD equivalents via ARROW_MAP; also accept WASD directly.
-        const code = e.keyCode || e.which;
-        handleKey(code);
-        // Prevent arrow keys from scrolling the page.
-        if ([37, 38, 39, 40].indexOf(code) !== -1) e.preventDefault();
-    }
 
     return {
         active: false,
@@ -178,13 +168,11 @@ window.comboInputGame = (function () {
             failures = 0;
             _gen++;
 
-            document.addEventListener('keydown', onKeyDown);
             $('#combo-input-container').show().removeClass('ci-flash-success ci-flash-fail ci-flash-wrong');
             startRound();
         },
 
         close: function () {
-            document.removeEventListener('keydown', onKeyDown);
             clearTimer();
             active      = false;
             this.active = false;

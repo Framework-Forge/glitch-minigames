@@ -1,5 +1,5 @@
 // -- Glitch Minigames
-// -- Copyright (C) 2024-2026 Glitch Studios
+// -- Copyright (C) 2024 Glitch
 // -- 
 // -- This program is free software: you can redistribute it and/or modify
 // -- it under the terms of the GNU General Public License as published by
@@ -16,19 +16,17 @@
 
 // Preset symbol sets
 const SYMBOL_PRESETS = {
-    symbols: ['\u25C6', '\u25C7', '\u25CB', '\u25CF', '\u25A1', '\u25A0', '\u25B3', '\u25B2', '\u25BD', '\u25BC', '\u25C8', '\u25C9', '\u25CE', '\u2605', '\u2606', '\u2726', '\u2727', '\u2B1F', '\u2B22', '\u2B21', '\u2B20', '\u2BC3', '\u2BC2', '\u2B24', '\u2B23', '\u2B2C', '\u2B2D', '\u2B2E', '\u2B2F', '\u232C'],
+    symbols: ['◆', '◇', '○', '●', '□', '■', '△', '▲', '▽', '▼', '◈', '◉', '◎', '★', '☆', '✦', '✧', '⬟', '⬢', '⬡', '⬠', '⯃', '⯂', '⬤', '⬣', '⬬', '⬭', '⬮', '⬯', '⌬'],
     letters: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'],
     numbers: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
-    dots: ['\u2801', '\u2802', '\u2803', '\u2804', '\u2805', '\u2806', '\u2807', '\u2808', '\u2809', '\u280A', '\u280B', '\u280C', '\u280D', '\u280E', '\u280F', '\u2810', '\u2811', '\u2812', '\u2813', '\u2814', '\u2815', '\u2816', '\u2817', '\u2818', '\u2819', '\u281A', '\u281B', '\u281C', '\u281D', '\u281E'],
-    emojis: ['\uD83D\uDD34', '\uD83D\uDFE0', '\uD83D\uDFE1', '\uD83D\uDFE2', '\uD83D\uDD35', '\uD83D\uDFE3', '\u26AB', '\u26AA', '\uD83D\uDFE4', '\uD83D\uDC80', '\uD83D\uDC7D', '\uD83E\uDD16', '\uD83D\uDC7E', '\uD83C\uDFAE', '\uD83D\uDC8E', '\uD83D\uDD25', '\u26A1', '\uD83D\uDCA7', '\uD83C\uDF1F', '\uD83C\uDFAF', '\uD83D\uDD11', '\uD83D\uDD12', '\uD83D\uDCB0', '\uD83C\uDFB2', '\uD83C\uDCCF', '\u2660\uFE0F', '\u2665\uFE0F', '\u2666\uFE0F', '\u2663\uFE0F', '\uD83C\uDFAA']
+    dots: ['⠁', '⠂', '⠃', '⠄', '⠅', '⠆', '⠇', '⠈', '⠉', '⠊', '⠋', '⠌', '⠍', '⠎', '⠏', '⠐', '⠑', '⠒', '⠓', '⠔', '⠕', '⠖', '⠗', '⠘', '⠙', '⠚', '⠛', '⠜', '⠝', '⠞'],
+    emojis: ['🔴', '🟠', '🟡', '🟢', '🔵', '🟣', '⚫', '⚪', '🟤', '💀', '👽', '🤖', '👾', '🎮', '💎', '🔥', '⚡', '💧', '🌟', '🎯', '🔑', '🔒', '💰', '🎲', '🃏', '♠️', '♥️', '♦️', '♣️', '🎪']
 };
-
-const SYMBOL_SEARCH_MIN_SHIFT = 1500;
 
 const symbolSearchState = {
     config: {
         gridSize: 8,
-        shiftInterval: 2500,
+        shiftInterval: 1000,
         timeLimit: 30000,
         minKeyLength: 1,
         maxKeyLength: 1,
@@ -81,9 +79,6 @@ function startSymbolSearchGame(config = {}) {
         symbolSearchState.config.symbols = SYMBOL_PRESETS.symbols;
     }
     
-    // the grid shifting faster than this is unreadable, so callers can only slow it down
-    symbolSearchState.config.shiftInterval = Math.max(SYMBOL_SEARCH_MIN_SHIFT, Number(symbolSearchState.config.shiftInterval) || 2500);
-
     symbolSearchState.config.minKeyLength = Math.max(1, Math.min(6, symbolSearchState.config.minKeyLength || 1));
     symbolSearchState.config.maxKeyLength = Math.max(1, Math.min(6, symbolSearchState.config.maxKeyLength || 1));
     
@@ -101,9 +96,8 @@ function startSymbolSearchGame(config = {}) {
     symbolSearchState.gameActive = false;
     symbolSearchState.timeRemaining = symbolSearchState.config.timeLimit;
     
-    // finish the last game's fade-out first, or it ends after this show() and hides the next round
-    $('#symbol-search-container').stop(true, true).show();
-
+    $('#symbol-search-container').show();
+    
     $('.symbol-search-grid').hide();
     $('.symbol-search-target-display').hide();
     $('.symbol-search-splash').show();
@@ -153,30 +147,20 @@ function initializeSymbolSearchGrid() {
     
     const keyLength = Math.floor(Math.random() * (maxLen - minLen + 1)) + minLen;
     
-    // Only one valid answer: the key's first symbol appears exactly once in the
-    // grid. The key uses distinct symbols (when the set is big enough) and the
-    // filler never uses the first one, so no other cell can start the sequence.
-    const pool = symbols.slice();
     symbolSearchState.targetKey = [];
     for (let i = 0; i < keyLength; i++) {
-        const source = pool.length > 0 ? pool : symbols;
-        const idx = Math.floor(Math.random() * source.length);
-        symbolSearchState.targetKey.push(source[idx]);
-        if (source === pool) pool.splice(idx, 1);
+        symbolSearchState.targetKey.push(symbols[Math.floor(Math.random() * symbols.length)]);
     }
-    const firstSymbol = symbolSearchState.targetKey[0];
-    let filler = symbols.filter(s => s !== firstSymbol);
-    if (filler.length === 0) filler = symbols;
-
+    
     const targetRow = Math.floor(Math.random() * gridSize);
     const targetCol = Math.floor(Math.random() * gridSize);
     symbolSearchState.targetStartPosition = { row: targetRow, col: targetCol };
-
+    
     symbolSearchState.grid = [];
     for (let row = 0; row < gridSize; row++) {
         symbolSearchState.grid[row] = [];
         for (let col = 0; col < gridSize; col++) {
-            symbolSearchState.grid[row][col] = filler[Math.floor(Math.random() * filler.length)];
+            symbolSearchState.grid[row][col] = symbols[Math.floor(Math.random() * symbols.length)];
         }
     }
     
@@ -356,10 +340,10 @@ function handleSymbolSearchKeyPress(event) {
     
     symbolSearchState.markerPosition = { row, col };
     updateMarkerPosition();
-
-    // move click at 75% volume
+    
+    // move sound tad bit annoying. will need to be changed.
     if (typeof playSoundSafe === 'function') {
-        playSoundSafe('sound-click', 0.75);
+        playSoundSafe('sound-click');
     }
 }
 
@@ -499,7 +483,7 @@ function endSymbolSearchGame(success, reason) {
     }
     
     setTimeout(() => {
-        fetch('https://' + GetParentResourceName() + '/symbolSearchResult', {
+        fetch('https://glitch-minigames/symbolSearchResult', {
             method: 'POST',
             body: JSON.stringify({ success: success, reason: reason })
         });
@@ -531,7 +515,7 @@ function closeSymbolSearchGame() {
     
     $('#symbol-search-container').hide();
     
-    fetch('https://' + GetParentResourceName() + '/symbolSearchClose', {
+    fetch('https://glitch-minigames/symbolSearchClose', {
         method: 'POST',
         body: JSON.stringify({})
     });
