@@ -1,3 +1,5 @@
+VersionCheck = true
+
 -- Glitch Minigames
 -- Copyright (C) 2024 Glitch
 -- 
